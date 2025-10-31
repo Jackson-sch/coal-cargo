@@ -1,0 +1,1182 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "./src/generated/prisma/client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model accounts {
+  id                String   @id
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+  usuarios          usuarios @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model clientes {
+  id                String                      @id @default(cuid())
+  nombre            String
+  apellidos         String?
+  razonSocial       String?
+  tipoDocumento     TipoDocumento
+  numeroDocumento   String                      @unique
+  ruc               String?                     @unique
+  direccion         String?
+  email             String?
+  telefono          String
+  distritoId        String?
+  esEmpresa         Boolean                     @default(false)
+  estado            Boolean                     @default(true)
+  createdAt         DateTime                    @default(now())
+  updatedAt         DateTime                    @updatedAt
+  deletedAt         DateTime?
+  distrito          ubigeo_distritos?           @relation(fields: [distritoId], references: [id])
+  cotizaciones      cotizaciones[]
+  envios            envios[]
+  enviosFacturacion envios[]                    @relation("EnvioClienteFacturacion")
+  comprobantes      comprobantes_electronicos[]
+
+  @@index([deletedAt])
+}
+
+// ✅ Nueva tabla para personas de contacto (responsables de recojo)
+model personas_contacto {
+  id              String        @id @default(cuid())
+  nombre          String
+  apellidos       String?
+  tipoDocumento   TipoDocumento
+  numeroDocumento String        @unique
+  telefono        String
+  email           String?
+  direccion       String?
+  empresa         String? // Empresa donde trabaja (opcional)
+  cargo           String? // Cargo en la empresa (opcional)
+  estado          Boolean       @default(true)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  deletedAt       DateTime?
+
+  // Relaciones
+  enviosResponsable envios[] @relation("EnvioResponsableRecojo")
+
+  @@index([deletedAt])
+  @@index([numeroDocumento])
+}
+
+model envios {
+  id        String  @id
+  guia      String  @unique
+  clienteId String?
+
+  // ✅ Sucursales
+  sucursalOrigenId  String
+  sucursalDestinoId String
+
+  // ✅ Información del paquete
+  peso           Float // Peso en kg
+  alto           Float? // Alto en cm
+  ancho          Float? // Ancho en cm
+  profundo       Float? // Profundo en cm
+  volumen        Float? // Volumen calculado en m³
+  descripcion    String? // Descripción del contenido
+  valorDeclarado Float? // Valor declarado
+
+  // ✅ Precio y servicio
+  total        Float // Precio total
+  tipoServicio TipoServicio? @default(NORMAL)
+  modalidad    Modalidad?    @default(SUCURSAL_SUCURSAL)
+
+  // ✅ Estado y progreso
+  estado   EstadoEnvio @default(REGISTRADO)
+  progreso Int         @default(0) // 0-100%
+
+  // ✅ Fechas del proceso
+  fechaRegistro       DateTime  @default(now())
+  fechaRecoleccion    DateTime?
+  fechaEnTransito     DateTime?
+  fechaLlegadaDestino DateTime?
+  fechaEntrega        DateTime?
+
+  // ✅ Información del remitente
+  remitenteNombre          String?
+  remitenteTelefono        String?
+  remitenteEmail           String?
+  remitenteDireccion       String?
+  remitenteTipoDocumento   TipoDocumento?
+  remitenteNumeroDocumento String?
+
+  // ✅ Información del destinatario
+  destinatarioNombre          String?
+  destinatarioTelefono        String?
+  destinatarioEmail           String?
+  destinatarioDireccion       String?
+  destinatarioTipoDocumento   TipoDocumento?
+  destinatarioNumeroDocumento String?
+
+  // ✅ NUEVO: Responsable de recojo (híbrido: relación + campos directos)
+  responsableRecojoId              String? // Relación opcional con personas_contacto
+  responsableRecojoNombre          String? // Campo directo para casos ocasionales
+  responsableRecojoApellidos       String?
+  responsableRecojoTipoDocumento   TipoDocumento?
+  responsableRecojoNumeroDocumento String?
+  responsableRecojoTelefono        String?
+  responsableRecojoEmail           String?
+  responsableRecojoDireccion       String?
+  responsableRecojoEmpresa         String? // Empresa donde trabaja
+  responsableRecojoCargo           String? // Cargo en la empresa
+
+  // ✅ NUEVO: Cliente de facturación (híbrido: relación + campos directos)
+  clienteFacturacionId              String? // Relación opcional con clientes
+  clienteFacturacionNombre          String? // Campo directo para casos ocasionales
+  clienteFacturacionApellidos       String?
+  clienteFacturacionRazonSocial     String?
+  clienteFacturacionTipoDocumento   TipoDocumento?
+  clienteFacturacionNumeroDocumento String?
+  clienteFacturacionRuc             String?
+  clienteFacturacionDireccion       String?
+  clienteFacturacionEmail           String?
+  clienteFacturacionTelefono        String?
+  clienteFacturacionEsEmpresa       Boolean?       @default(false)
+
+  // ✅ Información adicional
+  instruccionesEspeciales String?
+  requiereConfirmacion    Boolean @default(false)
+  notificacionesEnviadas  Boolean @default(false)
+  notas                   String?
+
+  // ✅ Asignación
+  asignadoA  String?
+  vehiculoId String?
+
+  // ✅ Timestamps
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  // ✅ Relaciones
+  cliente            clientes?                   @relation(fields: [clienteId], references: [id])
+  clienteFacturacion clientes?                   @relation("EnvioClienteFacturacion", fields: [clienteFacturacionId], references: [id])
+  responsableRecojo  personas_contacto?          @relation("EnvioResponsableRecojo", fields: [responsableRecojoId], references: [id])
+  sucursalOrigen     sucursales                  @relation("EnvioSucursalOrigen", fields: [sucursalOrigenId], references: [id])
+  sucursalDestino    sucursales                  @relation("EnvioSucursalDestino", fields: [sucursalDestinoId], references: [id])
+  usuario            usuarios?                   @relation(fields: [asignadoA], references: [id])
+  vehiculo           vehiculos?                  @relation(fields: [vehiculoId], references: [id])
+  eventos_envio      eventos_envio[]
+  pagos              pagos[]
+  notificaciones     notificaciones[]
+  comprobantes       comprobantes_electronicos[]
+
+  @@index([clienteId])
+  @@index([clienteFacturacionId])
+  @@index([responsableRecojoId])
+  @@index([sucursalOrigenId])
+  @@index([sucursalDestinoId])
+  @@index([estado])
+  @@index([fechaRegistro])
+  @@index([guia])
+  @@index([asignadoA])
+  @@index([vehiculoId])
+}
+
+model eventos_envio {
+  id           String      @id @default(cuid())
+  envioId      String
+  estado       EstadoEnvio
+  descripcion  String? // Descripción del evento (opcional)
+  comentario   String? // Comentario adicional
+  ubicacion    String? // Ubicación donde ocurrió el evento
+  direccion    String? // Dirección específica
+  latitud      Float? // Coordenadas GPS
+  longitud     Float? // Coordenadas GPS
+  fotoUrl      String? // URL de foto del evento
+  firmaUrl     String? // URL de firma de entrega
+  documentoUrl String? // URL de documento relacionado
+
+  // Información del responsable
+  creadoPor         String? // Usuario que registró el evento
+  nombreResponsable String? // Nombre de quien registró
+
+  // Información adicional
+  temperatura Float? // Para envíos que requieren control de temperatura
+  humedad     Float? // Para envíos especiales
+
+  // Timestamps
+  fechaEvento DateTime  @default(now()) // Cuándo ocurrió realmente el evento
+  createdAt   DateTime  @default(now()) // Cuándo se registró en el sistema
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+
+  // Relaciones
+  envios  envios    @relation(fields: [envioId], references: [id])
+  usuario usuarios? @relation(fields: [creadoPor], references: [id])
+
+  @@index([deletedAt])
+  @@index([envioId])
+  @@index([estado])
+  @@index([fechaEvento])
+}
+
+model pagos {
+  id         String    @id
+  envioId    String
+  monto      Float
+  metodo     String
+  referencia String?
+  fecha      DateTime  @default(now())
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  deletedAt  DateTime?
+  envios     envios    @relation(fields: [envioId], references: [id])
+
+  @@index([deletedAt])
+}
+
+model sessions {
+  id           String   @id
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  usuarios     usuarios @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model sucursales {
+  id                  String               @id
+  nombre              String
+  direccion           String
+  provincia           String
+  telefono            String?
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+  deletedAt           DateTime?
+  // Relaciones principales
+  enviosOrigen        envios[]             @relation("EnvioSucursalOrigen")
+  enviosDestino       envios[]             @relation("EnvioSucursalDestino")
+  cotizacionesDestino cotizaciones[]       @relation("CotizacionDestino")
+  cotizacionesOrigen  cotizaciones[]       @relation("CotizacionOrigen")
+  tarifasDestino      tarifas_sucursales[] @relation("TarifaDestino")
+  tarifasOrigen       tarifas_sucursales[] @relation("TarifaOrigen")
+  usuarios            usuarios[]
+  rutasOrigen         rutas[]              @relation("RutaOrigen")
+  rutasDestino        rutas[]              @relation("RutaDestino")
+
+  @@index([deletedAt])
+}
+
+model notificaciones {
+  id           String             @id @default(cuid())
+  envioId      String
+  tipo         TipoNotificacion
+  canal        CanalNotificacion
+  destinatario String // Email, teléfono, etc.
+  asunto       String?
+  mensaje      String
+  estado       EstadoNotificacion @default(PENDIENTE)
+  intentos     Int                @default(0)
+  maxIntentos  Int                @default(3)
+
+  // Información adicional
+  respuesta   String? // Respuesta del servicio de notificación
+  codigoError String? // Código de error si falló
+
+  // Programación
+  programadaPara DateTime? // Para notificaciones programadas
+  enviadaEn      DateTime? // Cuándo se envió exitosamente
+
+  // Timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relaciones
+  envio envios @relation(fields: [envioId], references: [id])
+
+  @@index([envioId])
+  @@index([programadaPara])
+}
+
+model tarifas_sucursales {
+  id                String         @id @default(cuid())
+  sucursalOrigenId  String
+  sucursalDestinoId String
+  precioBase        Float
+  precioKg          Float
+  tiempoEstimado    Int?
+  activo            Boolean        @default(true)
+  observaciones     String?
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+  cotizaciones      cotizaciones[]
+  sucursalDestino   sucursales     @relation("TarifaDestino", fields: [sucursalDestinoId], references: [id])
+  sucursalOrigen    sucursales     @relation("TarifaOrigen", fields: [sucursalOrigenId], references: [id])
+
+  @@unique([sucursalOrigenId, sucursalDestinoId])
+}
+
+model usuarios {
+  id                  String                @id
+  email               String                @unique
+  password            String
+  sucursalId          String?
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime              @updatedAt
+  emailVerified       DateTime?
+  name                String
+  phone               String?
+  role                Rol
+  deletedAt           DateTime?
+  accounts            accounts[]
+  envios              envios[]
+  sessions            sessions[]
+  permisos            usuario_permisos[]
+  sucursales          sucursales?           @relation(fields: [sucursalId], references: [id])
+  vehiculos           vehiculos?
+  eventos             eventos_envio[]
+  logs_auditoria      logs_auditoria[]
+  respaldos           respaldos[]
+  restauraciones      restauraciones[]
+  auditoria_respaldos auditoria_respaldos[]
+
+  @@index([deletedAt])
+}
+
+model vehiculos {
+  id          String    @id
+  placa       String    @unique
+  modelo      String?
+  capacidad   Float?
+  conductorId String?   @unique
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+  envios      envios[]
+  usuarios    usuarios? @relation(fields: [conductorId], references: [id])
+
+  @@index([deletedAt])
+}
+
+model verification_tokens {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model permisos {
+  id          String             @id @default(cuid())
+  codigo      String             @unique
+  nombre      String
+  descripcion String?
+  categoria   String
+  activo      Boolean            @default(true)
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+  usuarios    usuario_permisos[]
+}
+
+model usuario_permisos {
+  id        String   @id @default(cuid())
+  usuarioId String
+  permisoId String
+  otorgado  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  permiso   permisos @relation(fields: [permisoId], references: [id], onDelete: Cascade)
+  usuario   usuarios @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+
+  @@unique([usuarioId, permisoId])
+}
+
+model configuracion {
+  id          String   @id @default(uuid())
+  clave       String   @unique
+  valor       String
+  tipo        String
+  descripcion String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model ubigeo_departamentos {
+  id         String              @id
+  nombre     String
+  codigo     String              @unique
+  createdAt  DateTime            @default(now())
+  updatedAt  DateTime            @updatedAt
+  provincias ubigeo_provincias[]
+
+  @@map("Departamento")
+}
+
+model ubigeo_provincias {
+  id             String               @id
+  nombre         String
+  codigo         String               @unique
+  departamentoId String
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
+  distritos      ubigeo_distritos[]
+  departamento   ubigeo_departamentos @relation(fields: [departamentoId], references: [id])
+
+  @@map("Provincia")
+}
+
+model ubigeo_distritos {
+  id                  String            @id
+  nombre              String
+  codigo              String            @unique
+  provinciaId         String
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
+  provincia           ubigeo_provincias @relation(fields: [provinciaId], references: [id])
+  clientes            clientes[]
+  cotizacionesEntrega cotizaciones[]    @relation("CotizacionDistritoEntrega")
+  tarifasDestino      tarifas_destino[]
+
+  @@map("Distrito")
+}
+
+model tarifas_destino {
+  id                   String           @id @default(cuid())
+  distritoId           String
+  nombreZona           String
+  paquetePequeno       Float?
+  paqueteMediano       Float?
+  paqueteGrande        Float?
+  precioPorKg          Float?
+  precioPorVolumen     Float?
+  pesoMaximoPaquete    Float            @default(10.0)
+  volumenMaximoPaquete Float            @default(0.1)
+  tiempoEntregaDias    Int              @default(1)
+  requiereCoordinacion Boolean          @default(false)
+  observaciones        String?
+  activo               Boolean          @default(true)
+  createdAt            DateTime         @default(now())
+  updatedAt            DateTime         @updatedAt
+  distrito             ubigeo_distritos @relation(fields: [distritoId], references: [id])
+
+  @@index([distritoId])
+  @@index([activo])
+}
+
+model cotizaciones {
+  id                String              @id @default(cuid())
+  sucursalOrigenId  String
+  sucursalDestinoId String
+  direccionEntrega  String?
+  distritoEntregaId String?
+  peso              Float
+  alto              Float?
+  ancho             Float?
+  profundo          Float?
+  volumen           Float?
+  tipoServicio      TipoServicio        @default(NORMAL)
+  modalidad         Modalidad           @default(SUCURSAL_SUCURSAL)
+  tarifaSucursalId  String?
+  precioBase        Float
+  precioFinal       Float
+  descuento         Float               @default(0)
+  contenido         String?
+  valorDeclarado    Float?
+  requiereSeguro    Boolean             @default(false)
+  clienteId         String?
+  nombreCliente     String?
+  telefonoCliente   String?
+  emailCliente      String?
+  estado            EstadoCotizacion    @default(PENDIENTE)
+  validoHasta       DateTime
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+  cliente           clientes?           @relation(fields: [clienteId], references: [id])
+  distritoEntrega   ubigeo_distritos?   @relation("CotizacionDistritoEntrega", fields: [distritoEntregaId], references: [id])
+  sucursalDestino   sucursales          @relation("CotizacionDestino", fields: [sucursalDestinoId], references: [id])
+  sucursalOrigen    sucursales          @relation("CotizacionOrigen", fields: [sucursalOrigenId], references: [id])
+  tarifaSucursal    tarifas_sucursales? @relation(fields: [tarifaSucursalId], references: [id])
+
+  @@index([estado])
+  @@index([validoHasta])
+  @@index([clienteId])
+  @@index([sucursalOrigenId])
+  @@index([sucursalDestinoId])
+}
+
+enum Rol {
+  SUPER_ADMIN
+  ADMIN_SUCURSAL
+  OPERADOR
+  CONDUCTOR
+  CLIENTE
+  CONTADOR
+}
+
+enum TipoDocumento {
+  DNI
+  RUC
+  PASAPORTE
+  CARNET_EXTRANJERIA
+}
+
+enum EstadoVehiculo {
+  DISPONIBLE
+  EN_RUTA
+  MANTENIMIENTO
+  INACTIVO
+}
+
+enum EstadoRuta {
+  PROGRAMADA
+  EN_CURSO
+  COMPLETADA
+  CANCELADA
+}
+
+enum TipoServicio {
+  NORMAL
+  EXPRESS
+  OVERNIGHT
+  ECONOMICO
+}
+
+enum Modalidad {
+  SUCURSAL_SUCURSAL
+  DOMICILIO_SUCURSAL
+  SUCURSAL_DOMICILIO
+  DOMICILIO_DOMICILIO
+}
+
+enum EstadoEnvio {
+  REGISTRADO
+  EN_BODEGA
+  EN_TRANSITO
+  EN_REPARTO
+  ENTREGADO
+  DEVUELTO
+  ANULADO
+}
+
+enum TipoIncidencia {
+  RETRASO
+  PERDIDA
+  DIRECCION_INCORRECTA
+  DESTINATARIO_AUSENTE
+  OTRO
+}
+
+enum EstadoIncidencia {
+  ABIERTA
+  EN_PROCESO
+  RESUELTA
+  CERRADA
+}
+
+enum MetodoPago {
+  EFECTIVO
+  TARJETA_CREDITO
+  TARJETA_DEBITO
+  TRANSFERENCIA
+  DEPOSITO
+  YAPE
+  PLIN
+  TUNKI
+  BILLETERA_DIGITAL
+  CREDITO
+}
+
+enum EstadoPago {
+  PENDIENTE
+  PROCESANDO
+  CONFIRMADO
+  RECHAZADO
+  ANULADO
+}
+
+enum TipoComprobante {
+  BOLETA
+  FACTURA
+  NOTA_CREDITO
+  NOTA_DEBITO
+  GUIA_REMISION
+}
+
+enum EstadoCotizacion {
+  PENDIENTE
+  APROBADA
+  RECHAZADA
+  CONVERTIDA_ENVIO
+  EXPIRADA
+}
+
+enum TipoNotificacion {
+  REGISTRO_ENVIO
+  CAMBIO_ESTADO
+  ENTREGA_EXITOSA
+  INTENTO_ENTREGA
+  RETRASO
+  PROBLEMA
+  RECORDATORIO
+  CONFIRMACION_RECOLECCION
+}
+
+enum CanalNotificacion {
+  EMAIL
+  SMS
+  WHATSAPP
+  PUSH
+  LLAMADA
+}
+
+enum EstadoNotificacion {
+  PENDIENTE
+  ENVIADA
+  ENTREGADA
+  FALLIDA
+  CANCELADA
+}
+
+// Modelos para Facturación Electrónica SUNAT
+model comprobantes_electronicos {
+  id String @id @default(cuid())
+
+  // Información básica del comprobante
+  tipoComprobante TipoComprobante
+  serie           String
+  numero          Int
+  numeroCompleto  String          @unique
+
+  // Relaciones
+  clienteId String?
+  envioId   String?
+
+  // Información tributaria
+  rucEmisor         String
+  razonSocialEmisor String
+
+  // Datos del cliente
+  tipoDocumentoCliente   TipoDocumento
+  numeroDocumentoCliente String
+  nombreCliente          String
+  direccionCliente       String?
+
+  // Montos
+  subtotal  Float
+  igv       Float
+  total     Float
+  descuento Float @default(0)
+
+  // Fechas
+  fechaEmision     DateTime
+  fechaVencimiento DateTime?
+
+  // Estado del comprobante
+  estado EstadoComprobante @default(PENDIENTE)
+
+  // Información de SUNAT/PSE
+  xmlContent String? @db.Text
+  cdrContent String? @db.Text
+  hashCpe    String?
+
+  // Información del PSE
+  pseId        String?
+  pseResponse  String? @db.Text
+  codigoError  String?
+  mensajeError String? @db.Text
+
+  // URLs de archivos
+  xmlUrl String?
+  pdfUrl String?
+  cdrUrl String?
+
+  // Observaciones
+  observaciones String? @db.Text
+
+  // Timestamps
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  // Relaciones
+  cliente  clientes?              @relation(fields: [clienteId], references: [id])
+  envio    envios?                @relation(fields: [envioId], references: [id])
+  detalles comprobante_detalles[]
+
+  @@unique([serie, numero])
+  @@index([clienteId])
+  @@index([envioId])
+  @@index([estado])
+  @@index([fechaEmision])
+  @@index([numeroCompleto])
+}
+
+model comprobante_detalles {
+  id            String @id @default(cuid())
+  comprobanteId String
+
+  // Información del item
+  orden          Int
+  codigoProducto String?
+  descripcion    String
+  unidadMedida   String  @default("NIU")
+
+  // Cantidades y precios
+  cantidad       Float
+  precioUnitario Float
+  valorVenta     Float
+  igv            Float
+  precioTotal    Float
+
+  // Información tributaria
+  codigoTipoAfectacion String @default("10")
+  porcentajeIgv        Float  @default(18.00)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relaciones
+  comprobante comprobantes_electronicos @relation(fields: [comprobanteId], references: [id], onDelete: Cascade)
+
+  @@index([comprobanteId])
+}
+
+model configuracion_facturacion {
+  id String @id @default(cuid())
+
+  // Información de la empresa
+  ruc             String
+  razonSocial     String
+  nombreComercial String?
+  direccion       String
+  ubigeo          String
+
+  // Configuración PSE
+  pseProvider    String
+  pseToken       String?
+  pseUrlBase     String?
+  pseEnvironment String  @default("development")
+
+  // Series de comprobantes
+  serieFactura     String @default("F001")
+  serieBoleta      String @default("B001")
+  serieNotaCredito String @default("FC01")
+  serieNotaDebito  String @default("FD01")
+
+  // Numeración actual
+  ultimoNumeroFactura     Int @default(0)
+  ultimoNumeroBoleta      Int @default(0)
+  ultimoNumeroNotaCredito Int @default(0)
+  ultimoNumeroNotaDebito  Int @default(0)
+
+  // Configuración de impuestos
+  porcentajeIgv Float @default(18.00)
+
+  // Estado
+  activo Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+enum EstadoComprobante {
+  PENDIENTE
+  ACEPTADO
+  RECHAZADO
+  ANULADO
+  EXCEPCION
+}
+
+// ==================== RUTAS DE TRANSPORTE ====================
+
+model rutas {
+  id String @id @default(cuid())
+
+  // Información básica
+  nombre      String
+  codigo      String  @unique
+  descripcion String?
+
+  // Tipo y clasificación
+  tipo   TipoRuta   @default(URBANA)
+  estado EstadoRuta @default(PROGRAMADA)
+  activo Boolean    @default(true)
+
+  // Origen y destino
+  sucursalOrigenId  String
+  sucursalDestinoId String
+
+  // Información del recorrido
+  distancia      Float? // Distancia en kilómetros
+  tiempoEstimado Int? // Tiempo en minutos
+
+  // Costos
+  costoBase        Float @default(0)
+  costoPeajes      Float @default(0)
+  costoCombustible Float @default(0)
+  costoTotal       Float @default(0)
+
+  // Vehículo y capacidad
+  tipoVehiculo    TipoVehiculo?
+  capacidadMaxima Float? // Capacidad en kg
+
+  // Paradas intermedias (JSON)
+  paradas Json? // Array de paradas: [{"nombre": "Parada 1", "orden": 1}]
+
+  // Horarios (JSON)
+  horarios Json? // Array de horarios: ["08:00", "12:00", "16:00"]
+
+  // Observaciones
+  observaciones String?
+
+  // Relaciones
+  sucursalOrigen  sucursales @relation("RutaOrigen", fields: [sucursalOrigenId], references: [id])
+  sucursalDestino sucursales @relation("RutaDestino", fields: [sucursalDestinoId], references: [id])
+
+  // Timestamps
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@index([deletedAt])
+  @@index([activo])
+  @@index([tipo])
+  @@index([sucursalOrigenId])
+  @@index([sucursalDestinoId])
+}
+
+enum TipoRuta {
+  URBANA
+  INTERURBANA
+  INTERPROVINCIAL
+  INTERDEPARTAMENTAL
+}
+
+enum TipoVehiculo {
+  CAMION_PEQUENO
+  CAMION_MEDIANO
+  CAMION_GRANDE
+  TRAILER
+  FURGONETA
+  MOTOCICLETA
+}
+
+// ==================== AUDITORÍA Y LOGS ====================
+
+model logs_auditoria {
+  id        String       @id @default(cuid())
+  accion    String // LOGIN, CREATE_USER, DELETE_ENVIO, etc.
+  recurso   String // usuarios, envios, configuracion, etc.
+  detalles  String? // Información adicional en JSON
+  categoria CategoriaLog @default(SISTEMA)
+  severidad SeveridadLog @default(INFO)
+
+  // Usuario que realizó la acción (null para acciones del sistema)
+  usuarioId String?
+  usuario   usuarios? @relation(fields: [usuarioId], references: [id])
+
+  // Información de la sesión
+  ip        String?
+  userAgent String?
+
+  // Timestamp
+  fechaHora DateTime @default(now())
+
+  // Índices para búsquedas eficientes
+  @@index([fechaHora])
+  @@index([usuarioId])
+  @@index([accion])
+  @@index([categoria])
+  @@index([severidad])
+}
+
+enum CategoriaLog {
+  SISTEMA
+  SEGURIDAD
+  USUARIOS
+  ENVIOS
+  CLIENTES
+  FACTURACION
+  CONFIGURACION
+  BACKUP
+  AUDITORIA
+}
+
+enum SeveridadLog {
+  INFO
+  WARNING
+  ERROR
+  CRITICAL
+}
+
+// ==================== SISTEMA DE RESPALDOS ====================
+
+model respaldos {
+  id String @id @default(cuid())
+
+  // Información básica
+  nombre      String
+  descripcion String?
+  tipo        TipoRespaldo @default(MANUAL)
+
+  // Estado y progreso
+  estado   EstadoRespaldo @default(INICIADO)
+  progreso Int            @default(0) // 0-100%
+
+  // Información del archivo
+  nombreArchivo String?
+  rutaArchivo   String?
+  tamano        BigInt? // Tamaño en bytes
+  checksum      String? // Hash SHA256 del archivo
+
+  // Ubicación de almacenamiento
+  almacenamientoLocal Boolean @default(true)
+  almacenamientoNube  Boolean @default(false)
+  rutaNube            String?
+
+  // Configuración
+  encriptado      Boolean @default(true)
+  comprimido      Boolean @default(true)
+  incluyeArchivos Boolean @default(false)
+
+  // Tablas incluidas (JSON array)
+  tablasIncluidas Json?
+
+  // Información de tiempo
+  fechaInicio       DateTime
+  fechaFinalizacion DateTime?
+  duracion          Int? // Duración en segundos
+
+  // Información del usuario
+  creadoPor String?
+  usuario   usuarios? @relation(fields: [creadoPor], references: [id])
+
+  // Información de error
+  mensajeError String?
+  detalleError String? @db.Text
+
+  // Configuración de retención
+  fechaExpiracion DateTime?
+  eliminadoEn     DateTime?
+
+  // Metadatos adicionales
+  metadatos Json? // Información adicional como versión de la BD, etc.
+
+  // Timestamps
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  // Relaciones
+  restauraciones      restauraciones[]
+  auditoria_respaldos auditoria_respaldos[]
+
+  @@index([tipo])
+  @@index([estado])
+  @@index([fechaInicio])
+  @@index([creadoPor])
+  @@index([deletedAt])
+}
+
+model restauraciones {
+  id String @id @default(cuid())
+
+  // Respaldo utilizado
+  respaldoId String
+  respaldo   respaldos @relation(fields: [respaldoId], references: [id])
+
+  // Estado y progreso
+  estado   EstadoRestauracion @default(INICIADO)
+  progreso Int                @default(0) // 0-100%
+
+  // Configuración de restauración
+  restaurarCompleto   Boolean @default(true)
+  tablasSeleccionadas Json? // Array de tablas específicas a restaurar
+
+  // Opciones de restauración
+  sobrescribirDatos  Boolean @default(false)
+  crearRespaldoAntes Boolean @default(true)
+  respaldoPrevioId   String?
+
+  // Información de tiempo
+  fechaInicio       DateTime
+  fechaFinalizacion DateTime?
+  duracion          Int? // Duración en segundos
+
+  // Usuario que realizó la restauración
+  creadoPor String?
+  usuario   usuarios? @relation(fields: [creadoPor], references: [id])
+
+  // Información de error
+  mensajeError String?
+  detalleError String? @db.Text
+
+  // Resultados
+  registrosRestaurados Int?
+  tablasRestauradas    Json? // Array con información de cada tabla restaurada
+
+  // Timestamps
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@index([respaldoId])
+  @@index([estado])
+  @@index([fechaInicio])
+  @@index([creadoPor])
+  @@index([deletedAt])
+}
+
+model configuracion_respaldos {
+  id String @id @default(cuid())
+
+  // Configuración automática
+  respaldosAutomaticos Boolean            @default(true)
+  frecuencia           FrecuenciaRespaldo @default(DIARIO)
+  horaEjecucion        String             @default("02:00") // Formato HH:MM
+
+  // Retención
+  diasRetencion Int @default(30)
+  maxRespaldos  Int @default(50)
+
+  // Almacenamiento
+  almacenamientoLocal Boolean @default(true)
+  almacenamientoNube  Boolean @default(false)
+  rutaLocal           String  @default("/backups")
+
+  // Configuración de nube
+  proveedorNube    String? // AWS, Google Cloud, Azure, etc.
+  bucketNube       String?
+  credencialesNube Json? // Credenciales encriptadas
+
+  // Configuración de seguridad
+  encriptarRespaldos Boolean @default(true)
+  claveEncriptacion  String? // Clave encriptada
+
+  // Compresión
+  comprimirRespaldos Boolean @default(true)
+  nivelCompresion    Int     @default(6) // 1-9
+
+  // Notificaciones
+  notificarExito     Boolean @default(true)
+  notificarError     Boolean @default(true)
+  emailsNotificacion Json? // Array de emails
+
+  // Configuración avanzada
+  timeoutRespaldo Int @default(3600) // Timeout en segundos
+  maxIntentos     Int @default(3)
+
+  // Tablas a excluir (JSON array)
+  tablasExcluidas Json?
+
+  // Estado
+  activo Boolean @default(true)
+
+  // Timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([id]) // Solo debe haber una configuración
+}
+
+model estadisticas_respaldos {
+  id String @id @default(cuid())
+
+  // Período de la estadística
+  fecha DateTime @default(now())
+
+  // Métricas de respaldos
+  totalRespaldos    Int @default(0)
+  respaldosExitosos Int @default(0)
+  respaldosFallidos Int @default(0)
+
+  // Métricas de restauraciones
+  totalRestauraciones    Int @default(0)
+  restauracionesExitosas Int @default(0)
+  restauracionesFallidas Int @default(0)
+
+  // Métricas de almacenamiento
+  espacioUtilizadoLocal BigInt @default(0) // En bytes
+  espacioUtilizadoNube  BigInt @default(0) // En bytes
+
+  // Métricas de tiempo
+  tiempoPromedioRespaldo     Int? // En segundos
+  tiempoPromedioRestauracion Int? // En segundos
+
+  // Métricas de tamaño
+  tamanoPromedioRespaldo BigInt? // En bytes
+  tamanoTotalRespaldos   BigInt  @default(0) // En bytes
+
+  // Timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([fecha])
+  @@index([fecha])
+}
+
+enum TipoRespaldo {
+  MANUAL
+  AUTOMATICO
+  PROGRAMADO
+  EMERGENCIA
+}
+
+enum EstadoRespaldo {
+  INICIADO
+  EN_PROGRESO
+  COMPLETADO
+  FALLIDO
+  CANCELADO
+}
+
+enum EstadoRestauracion {
+  INICIADO
+  EN_PROGRESO
+  COMPLETADO
+  FALLIDO
+  CANCELADO
+}
+
+enum FrecuenciaRespaldo {
+  CADA_HORA
+  CADA_6_HORAS
+  CADA_12_HORAS
+  DIARIO
+  SEMANAL
+  MENSUAL
+}
+
+model auditoria_respaldos {
+  id          String         @id @default(cuid())
+  respaldoId  String
+  accion      AccionRespaldo
+  descripcion String
+  usuarioId   String
+  ipAddress   String?
+  userAgent   String?
+  createdAt   DateTime       @default(now())
+  respaldo    respaldos      @relation(fields: [respaldoId], references: [id])
+  usuario     usuarios       @relation(fields: [usuarioId], references: [id])
+
+  @@index([respaldoId])
+  @@index([usuarioId])
+  @@index([createdAt])
+}
+
+enum AccionRespaldo {
+  CREAR
+  RESTAURAR
+  ELIMINAR
+  DESCARGAR
+  CONFIGURAR
+  PROGRAMAR
+}

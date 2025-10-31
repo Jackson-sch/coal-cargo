@@ -1,0 +1,125 @@
+/* Estilos globales para impresión de vouchers */
+@media print {
+  /* Configuración de página */
+  @page {
+    size: 80mm auto;
+    margin: 0;
+    padding: 0;
+  }
+
+  /* Ocultar todo excepto el voucher */
+  body * {
+    visibility: hidden;
+  }
+
+  /* Mostrar solo el contenido del ticket */
+  .ticket-print,
+  .ticket-print * {
+    visibility: visible;
+  }
+
+  /* Posicionar el ticket */
+  .ticket-print {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 80mm;
+    max-width: 80mm;
+    margin: 0;
+    padding: 4mm;
+    font-family: "Courier New", monospace;
+    font-size: 10px;
+    line-height: 1.2;
+    color: black !important;
+    background: white !important;
+    page-break-inside: avoid;
+  }
+
+  /* Formato 58mm */
+  .ticket-58 {
+    width: 58mm;
+    max-width: 58mm;
+    font-size: 9px;
+  }
+
+  /* Formato 80mm */
+  .ticket-80 {
+    width: 80mm;
+    max-width: 80mm;
+    font-size: 10px;
+  }
+
+  /* Ocultar elementos no imprimibles */
+  .no-print,
+  .header-actions,
+  button:not(.print-visible) {
+    display: none !important;
+  }
+
+  /* Estilos para elementos específicos */
+  .qr-box {
+    page-break-inside: avoid;
+  }
+
+  /* Asegurar que el QR no se corte */
+  .qr canvas {
+    max-width: 100px !important;
+    height: auto !important;
+  }
+
+  /* Separadores */
+  hr {
+    border-color: black !important;
+    margin: 2mm 0 !important;
+  }
+
+  /* Cards y contenedores */
+  .card {
+    border: none !important;
+    box-shadow: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  .card-header,
+  .card-content {
+    padding: 2mm 0 !important;
+  }
+
+  /* Grids responsivos para impresión */
+  .grid {
+    display: block !important;
+  }
+
+  .grid > div {
+    display: flex !important;
+    justify-content: space-between !important;
+    margin-bottom: 1mm !important;
+    font-size: 9px !important;
+  }
+
+  /* Texto y fuentes */
+  * {
+    color: black !important;
+    background: transparent !important;
+  }
+
+  .font-mono {
+    font-family: "Courier New", monospace !important;
+  }
+
+  .text-sm {
+    font-size: 8px !important;
+  }
+
+  .text-xs {
+    font-size: 7px !important;
+  }
+
+  /* Evitar saltos de página */
+  .space-y-3 > *,
+  .space-y-4 > * {
+    page-break-inside: avoid;
+    margin-bottom: 2mm !important;
+  }
+}

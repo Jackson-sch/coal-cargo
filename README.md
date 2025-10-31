@@ -1,33 +1,87 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
+# Sistema de Gestión de Envíos
 
-## Getting Started
+Sistema integral de gestión de envíos y logística desarrollado con Next.js 14, Prisma y PostgreSQL.
 
-First, run the development server:
+## Características Principales
 
+- **Gestión de Envíos**: Control completo del ciclo de vida de los envíos
+- **Facturación Electrónica**: Integración con SUNAT para comprobantes electrónicos
+- **Gestión de Clientes**: Base de datos completa de clientes y destinatarios
+- **Dashboard Analítico**: Métricas y reportes en tiempo real
+- **Configuración Flexible**: Sistema de configuración modular
+- **Autenticación Segura**: Sistema de login con NextAuth.js
+
+## Tecnologías Utilizadas
+
+- **Frontend**: Next.js 14, React, Tailwind CSS, Shadcn/ui
+- **Backend**: Next.js API Routes, Prisma ORM
+- **Base de Datos**: PostgreSQL
+- **Autenticación**: NextAuth.js
+- **Facturación**: Integración con API-GO para SUNAT
+
+## Instalación
+
+1. Clona el repositorio:
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+git clone [url-del-repositorio]
+cd coal_cargo
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+2. Instala las dependencias:
+```bash
+npm install
+```
 
-You can start editing the page by modifying `app/page.js`. The page auto-updates as you edit the file.
+3. Configura las variables de entorno:
+```bash
+cp .env.example .env.local
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+4. Configura la base de datos:
+```bash
+npx prisma migrate dev
+npx prisma db seed
+```
 
-## Learn More
+5. Inicia el servidor de desarrollo:
+```bash
+npm run dev
+```
 
-To learn more about Next.js, take a look at the following resources:
+## Estructura del Proyecto
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```
+src/
+├── app/                    # App Router de Next.js
+│   ├── dashboard/         # Páginas del dashboard
+│   ├── login/            # Página de login
+│   └── api/              # API Routes
+├── components/           # Componentes reutilizables
+├── lib/                 # Utilidades y configuraciones
+├── hooks/               # Custom hooks
+└── styles/              # Estilos globales
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Configuración
+
+El sistema incluye un módulo de configuración completo que permite personalizar:
+
+- Información de la empresa
+- Configuración de facturación
+- Parámetros operacionales
+- Notificaciones del sistema
+
+## Contribución
+
+1. Fork el proyecto
+2. Crea una rama para tu feature (`git checkout -b feature/AmazingFeature`)
+3. Commit tus cambios (`git commit -m 'Add some AmazingFeature'`)
+4. Push a la rama (`git push origin feature/AmazingFeature`)
+5. Abre un Pull Request
+
+## Licencia
+
+Este proyecto está bajo la Licencia MIT - ver el archivo [LICENSE](LICENSE) para más detalles.
 
 ## Deploy on Vercel
 

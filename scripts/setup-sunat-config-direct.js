@@ -1,0 +1,9 @@
+const { Client } = require('pg') async function setupSunatConfig() { const client = new Client({ connectionString: process.env.DATABASE_URL }) try { await client.connect() console.log('🔧 Configurando datos de empresa para SUNAT...') // Verificar si ya existe configuración const existingConfig = await client.query('SELECT * FROM configuracion_facturacion LIMIT 1') if (existingConfig.rows.length > 0) { console.log('✅ Ya existe configuración de facturación') const config = existingConfig.rows[0] console.log('Configuración actual:', { ruc: config.ruc, razon_social: config.razon_social, direccion: config.direccion }) return }
+
+    // Crear configuración inicial const insertQuery = ` INSERT INTO configuracion_facturacion ( ruc, razon_social, direccion, ubigeo, urbanizacion, departamento, provincia, distrito, codigo_pais, serie_factura, serie_boleta, serie_nota_credito, serie_nota_debito, activo, created_at, updated_at ) VALUES ( $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16 ) RETURNING * `
+
+    const values = [ process.env.EMPRESA_RUC || '20123456789', process.env.EMPRESA_RAZON_SOCIAL || 'Coal Cargo S.A.C.', process.env.EMPRESA_DIRECCION || 'Av. Principal 123, Lima, Perú', '150101', // Lima - Lima - Lima '', 'LIMA', 'LIMA', 'LIMA', 'PE', 'F001', 'B001', 'FC01', 'FD01', true, new Date(), new Date() ]
+
+    const result = await client.query(insertQuery, values) const config = result.rows[0] console.log('✅ Configuración de facturación creada exitosamente:') console.log({ ruc: config.ruc, razon_social: config.razon_social, direccion: config.direccion, series: { factura: config.serie_factura, boleta: config.serie_boleta, nota_credito: config.serie_nota_credito, nota_debito: config.serie_nota_debito }
+    }) } catch (error) { console.error('❌ Error configurando SUNAT:', error) } finally { await client.end() }
+} setupSunatConfig()

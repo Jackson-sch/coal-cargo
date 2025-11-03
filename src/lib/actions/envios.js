@@ -23,7 +23,7 @@ export async function getEnvios(filtros = {}) {
       numeroGuia,
       guia,
       page = 1,
-      limit = 50,
+      limit = 8,
     } = filtros;
 
     // Construir condiciones WHERE
@@ -789,7 +789,9 @@ export async function actualizarEstadoEnvio(
   envioId,
   nuevoEstado,
   descripcion,
-  ubicacion
+  ubicacion,
+  fotoUrl = null,
+  firmaUrl = null
 ) {
   try {
     if (!envioId || !nuevoEstado) {
@@ -878,6 +880,8 @@ export async function actualizarEstadoEnvio(
             (nuevoEstado === "ENTREGADO"
               ? envio.sucursalDestino.nombre
               : envio.sucursalOrigen.nombre),
+          fotoUrl: fotoUrl || null,
+          firmaUrl: firmaUrl || null,
         },
       });
 

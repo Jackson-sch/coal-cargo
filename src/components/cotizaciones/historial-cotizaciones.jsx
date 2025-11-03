@@ -41,6 +41,11 @@ import {
 import ModalDetalleCotizacion from "./modal-detalle-cotizacion";
 import ModalDatosCliente from "./modal-datos-cliente";
 import { formatSoles, formatDate } from "@/lib/utils/formatters";
+import FiltrosHistorial from "./filtros-historial";
+import {
+  modalidadesObject,
+  tiposServicioObject,
+} from "@/lib/constants/estados";
 
 const estadoColors = {
   PENDIENTE: "bg-yellow-100 text-yellow-800",
@@ -56,18 +61,8 @@ const estadoLabels = {
   CONVERTIDA_ENVIO: "Convertida a Envío",
   EXPIRADA: "Expirada",
 };
-const tipoServicioLabels = {
-  NORMAL: "Normal",
-  EXPRESS: "Express",
-  OVERNIGHT: "Overnight",
-  ECONOMICO: "Económico",
-};
-const modalidadLabels = {
-  SUCURSAL_SUCURSAL: "Sucursal a Sucursal",
-  SUCURSAL_DOMICILIO: "Sucursal a Domicilio",
-  DOMICILIO_SUCURSAL: "Domicilio a Sucursal",
-  DOMICILIO_DOMICILIO: "Domicilio a Domicilio",
-};
+const tipoServicioLabels = tiposServicioObject;
+const modalidadLabels = modalidadesObject;
 
 export default function HistorialCotizaciones() {
   const [cotizaciones, setCotizaciones] = useState([]);
@@ -223,65 +218,11 @@ export default function HistorialCotizaciones() {
   return (
     <div className="space-y-6">
       {/* Filtros */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Filter className="h-5 w-5" /> Filtros
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div className="space-y-2">
-              <Label>Estado</Label>
-              <Select
-                value={filtros.estado}
-                onValueChange={(value) => handleFiltroChange("estado", value)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Todos los estados" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="TODOS">Todos</SelectItem>
-                  <SelectItem value="PENDIENTE">Pendiente</SelectItem>
-                  <SelectItem value="APROBADA">Aprobada</SelectItem>
-                  <SelectItem value="RECHAZADA">Rechazada</SelectItem>
-                  <SelectItem value="CONVERTIDA_ENVIO">
-                    Convertida a Envío
-                  </SelectItem>
-                  <SelectItem value="EXPIRADA">Expirada</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2 md:col-span-2">
-              <Label>Rango de Fechas</Label>
-              <DatePickerWithRange
-                date={filtros.fechaRango}
-                setDate={(dateRange) =>
-                  handleFiltroChange("fechaRango", dateRange)
-                }
-                placeholder="Seleccionar rango de fechas"
-                className="w-full"
-              />
-            </div>
-            <div className="flex items-end">
-              <Button
-                onClick={() => {
-                  setFiltros({
-                    estado: "TODOS",
-                    fechaRango: { from: null, to: null },
-                    page: 1,
-                    limit: 10,
-                  });
-                }}
-                variant="outline"
-                className="w-full"
-              >
-                Limpiar Filtros
-              </Button>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      <FiltrosHistorial
+        filtros={filtros}
+        handleFiltroChange={handleFiltroChange}
+      />
+
       {/* Lista de Cotizaciones */}
       <Card>
         <CardHeader>
@@ -314,10 +255,12 @@ export default function HistorialCotizaciones() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>ID</TableHead> <TableHead>Ruta</TableHead>
+                      {/* <TableHead>ID</TableHead>  */}
+                      <TableHead>Ruta</TableHead>
                       <TableHead>Cliente</TableHead>
                       <TableHead>Servicio</TableHead>
-                      <TableHead>Peso</TableHead> <TableHead>Precio</TableHead>
+                      <TableHead>Peso</TableHead> 
+                      <TableHead>Precio</TableHead>
                       <TableHead>Estado</TableHead>
                       <TableHead>Válido Hasta</TableHead>
                       <TableHead>Acciones</TableHead>
@@ -326,9 +269,9 @@ export default function HistorialCotizaciones() {
                   <TableBody>
                     {cotizaciones.map((cotizacion) => (
                       <TableRow key={cotizacion.id}>
-                        <TableCell className="font-mono text-xs">
+                        {/* <TableCell className="font-mono text-xs">
                           {cotizacion.id.slice(-8)}
-                        </TableCell>
+                        </TableCell> */}
                         <TableCell>
                           <div className="flex items-center gap-2 min-w-0">
                             <div className="flex items-center gap-1 text-xs">

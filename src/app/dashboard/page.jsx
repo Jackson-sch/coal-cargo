@@ -1,13 +1,8 @@
 "use client";
+
 import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
-import {
-  Package,
-  CheckCircle,
-  AlertTriangle,
-  Truck,
-  Loader2,
-} from "lucide-react";
+import { Package, CheckCircle, AlertTriangle, Truck } from "lucide-react";
 import { toast } from "sonner";
 import {
   getDashboardKpis,
@@ -23,7 +18,8 @@ import ResumenMes from "@/components/dashboard/resumen-mes";
 import EstadoSistema from "@/components/dashboard/estado-sistema";
 import StatCard from "@/components/dashboard/stat-card";
 import HeaderDashboard from "@/components/dashboard/header-dashboard";
-import { Spinner } from "@/components/ui/spinner";
+import SpinnerGeneral from "@/components/spinner-general";
+import { palette } from "@/lib/utils/palette";
 
 export default function DashboardPage() {
   const { data: session } = useSession();
@@ -31,7 +27,7 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [sucursales, setSucursales] = useState([]);
   const [sucursalId, setSucursalId] = useState("ALL"); // "ALL" = toda s
-  const [trend, setTrend] = useState(null)
+  const [trend, setTrend] = useState(null);
 
   useEffect(() => {
     // Cuando esté lista la sesión, cargar dato s
@@ -43,7 +39,7 @@ export default function DashboardPage() {
       fetchTrend();
     }
   }, [session]);
-  
+
   useEffect(() => {
     const id = setInterval(() => {
       fetchKpis();
@@ -103,19 +99,6 @@ export default function DashboardPage() {
     ([estado, cantidad]) => ({ estado, cantidad })
   );
 
-  const palette = [
-    "#3b82f6",
-    "#10b981",
-    "#f59e0b",
-    "#ef4444",
-    "#8b5cf6",
-    "#06b6d4",
-    "#f43f5e",
-    "#84cc16",
-    "#a855f7",
-    "#14b8a6",
-  ];
-
   const chartConfig = estadosData.reduce((acc, item, idx) => {
     acc[item.estado] = {
       label: item.estado.replace(/_/g, " "),
@@ -124,32 +107,10 @@ export default function DashboardPage() {
     return acc;
   }, {});
 
-if (loading) {
-  return (
-    <div className="flex items-center justify-center min-h-[400px]">
-      <div className="text-center">
-        <div className="flex justify-center items-center mb-6">
-          <div className="relative w-16 h-16">
-            {[0, 1, 2].map((i) => (
-              <div
-                key={i}
-                className="absolute inset-0 rounded-full border-2 border-transparent border-t-blue-500 border-r-purple-500"
-                style={{
-                  animation: `spin 1.5s linear infinite`,
-                  animationDelay: `${i * 0.2}s`,
-                  opacity: 1 - i * 0.3,
-                }}
-              />
-            ))}
-          </div>
-        </div>
-        <p className="text-base font-medium bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 bg-clip-text text-transparent">
-          Cargando estadísticas...
-        </p>
-      </div>
-    </div>
-  );
-}
+  if (loading) {
+    return <SpinnerGeneral text="Cargando estadísticas..." />;
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}

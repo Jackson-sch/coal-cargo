@@ -316,7 +316,7 @@ export default function ModalDatosCliente({
   };
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-3xl max-h-[90vh] overflow-hidden p-0">
+      <DialogContent className="sm:max-w-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader className="border-b bg-muted px-6 py-4">
           <div className="flex items-center gap-3">
             <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary">
@@ -330,36 +330,39 @@ export default function ModalDatosCliente({
             </div>
           </div>
         </DialogHeader>
-        <div className="grid lg:grid-cols-[280px_1fr] overflow-hidden">
+        <div className="grid lg:grid-cols-[280px_1fr] ">
           {/* Sidebar - Resumen compacto */}
           {cotizacion && (
-            <div className="border-r bg-muted/50 p-4 overflow-y-auto max-h-[calc(90vh-85px)]">
+            <div className="border-r bg-muted/50 p-4 max-h-[calc(90vh-85px)]">
               <div className="space-y-3">
                 <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                   Resumen
                 </h3>
                 <div className="space-y-2 text-sm">
-                  <div className="flex items-start gap-2">
-                    <MapPin className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs text-muted-foreground">Origen</p>
-                      <p className="font-medium truncate">
-                        {cotizacion.sucursalOrigen?.nombre || "N/A"}
-                      </p>
+                  <div className="flex items-center justify-between sm:flex-col">
+                    <div className="flex items-start gap-2">
+                      <MapPin className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs text-muted-foreground">Origen</p>
+                        <p className="font-medium truncate text-xs sm:text-sm">
+                          {cotizacion.sucursalOrigen?.nombre || "N/A"}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex justify-center py-1">
+                      <ArrowRight className="h-4 w-4 text-muted-foreground" />
+                    </div>
+                    <div className="flex items-start gap-2">
+                      <MapPin className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs text-muted-foreground">Destino</p>
+                        <p className="font-medium truncate text-xs sm:text-sm">
+                          {cotizacion.sucursalDestino?.nombre || "N/A"}
+                        </p>
+                      </div>
                     </div>
                   </div>
-                  <div className="flex justify-center py-1">
-                    <ArrowRight className="h-4 w-4 text-muted-foreground" />
-                  </div>
-                  <div className="flex items-start gap-2">
-                    <MapPin className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs text-muted-foreground">Destino</p>
-                      <p className="font-medium truncate">
-                        {cotizacion.sucursalDestino?.nombre || "N/A"}
-                      </p>
-                    </div>
-                  </div>
+
                   <Separator className="my-2" />
                   <div className="flex justify-between items-center py-1">
                     <span className="text-xs text-muted-foreground">Peso</span>
@@ -377,7 +380,7 @@ export default function ModalDatosCliente({
             </div>
           )}
           {/* Main form - Compact layout */}
-          <div className="overflow-y-auto max-h-[calc(90vh-85px)] p-6">
+          <div className="max-h-[calc(90vh-85px)] p-6">
             <Form {...form}>
               <form
                 onSubmit={form.handleSubmit(handleSubmit, (errors) => {
@@ -418,7 +421,7 @@ export default function ModalDatosCliente({
                             defaultValue={field.value}
                           >
                             <FormControl>
-                              <SelectTrigger className="h-9">
+                              <SelectTrigger className="h-9 w-full sm:w-60">
                                 <SelectValue />
                               </SelectTrigger>
                             </FormControl>
@@ -677,7 +680,7 @@ export default function ModalDatosCliente({
                                 defaultValue={field.value}
                               >
                                 <FormControl>
-                                  <SelectTrigger className="h-9">
+                                  <SelectTrigger className="h-9 w-full sm:w-60">
                                     <SelectValue />
                                   </SelectTrigger>
                                 </FormControl>
@@ -918,7 +921,7 @@ export default function ModalDatosCliente({
                     />
                   </div>
                 </div>
-                <div className="flex justify-end gap-2 pt-4 border-t">
+                <div className="flex justify-end gap-2 py-4 border-t">
                   <Button
                     type="button"
                     variant="outline"

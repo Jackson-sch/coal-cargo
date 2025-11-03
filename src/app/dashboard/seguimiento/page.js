@@ -27,80 +27,22 @@ import {
   Calendar,
   Weight,
   FileText,
-  Navigation,
   Building,
   ArrowRight,
   Loader2,
 } from "lucide-react";
 import { toast } from "sonner";
-const estadosConfig = {
-  REGISTRADO: {
-    label: "Registrado",
-    color: "bg-blue-500",
-    icon: FileText,
-    description: "El envío ha sido registrado en el sistema",
-  },
-  RECOLECTADO: {
-    label: "Recolectado",
-    color: "bg-orange-500",
-    icon: Package,
-    description: "El paquete ha sido recolectado",
-  },
-  EN_AGENCIA_ORIGEN: {
-    label: "En Agencia Origen",
-    color: "bg-yellow-500",
-    icon: Building,
-    description: "El paquete está en la agencia de origen",
-  },
-  EN_TRANSITO: {
-    label: "En Tránsito",
-    color: "bg-purple-500",
-    icon: Truck,
-    description: "El paquete está en camino al destino",
-  },
-  EN_AGENCIA_DESTINO: {
-    label: "En Agencia Destino",
-    color: "bg-indigo-500",
-    icon: Building,
-    description: "El paquete ha llegado a la agencia de destino",
-  },
-  EN_REPARTO: {
-    label: "En Reparto",
-    color: "bg-cyan-500",
-    icon: Navigation,
-    description: "El paquete está siendo entregado",
-  },
-  ENTREGADO: {
-    label: "Entregado",
-    color: "bg-green-500",
-    icon: CheckCircle,
-    description: "El paquete ha sido entregado exitosamente",
-  },
-  DEVUELTO: {
-    label: "Devuelto",
-    color: "bg-red-500",
-    icon: AlertCircle,
-    description: "El paquete ha sido devuelto",
-  },
-  CANCELADO: {
-    label: "Cancelado",
-    color: "bg-gray-500",
-    icon: AlertCircle,
-    description: "El envío ha sido cancelado",
-  },
-};
-const tiposServicioLabels = {
-  NORMAL: "Normal",
-  EXPRESS: "Express",
-  OVERNIGHT: "Overnight",
-  ECONOMICO: "Económico",
-};
-const modalidadLabels = {
-  SUCURSAL_SUCURSAL: "Sucursal a Sucursal",
-  SUCURSAL_DOMICILIO: "Sucursal a Domicilio",
-  DOMICILIO_SUCURSAL: "Domicilio a Sucursal",
-  DOMICILIO_DOMICILIO: "Domicilio a Domicilio",
-};
+import {
+  estadosEnvioObject,
+  modalidadesObject,
+  tiposServicioObject,
+} from "@/lib/constants/estados";
+import Seguimiento from "@/components/envios/detalle/seguimiento";
+
+const estadosConfig = estadosEnvioObject;
+const modalidadLabels = modalidadesObject;
+const tiposServicioLabels = tiposServicioObject;
+
 export default function SeguimientoPage() {
   const [guia, setGuia] = useState("");
   const [loading, setLoading] = useState(false);
@@ -169,7 +111,7 @@ export default function SeguimientoPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="flex gap-4">
+          <div className="flex flex-col md:flex-row gap-4">
             <div className="flex-1">
               <Label htmlFor="guia">Número de Guía</Label>
               <Input
@@ -400,98 +342,7 @@ export default function SeguimientoPage() {
             </CardContent>
           </Card>
           {/* Historial de Eventos */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Clock className="h-5 w-5" /> Historial de Eventos
-              </CardTitle>
-              <CardDescription>Seguimiento detallado del envío</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {envio.eventos.map((evento, index) => {
-                  const config = estadosConfig[evento.estado];
-                  const IconComponent = config?.icon || AlertCircle;
-                  return (
-                    <div key={evento.id || index} className="flex gap-4">
-                      <div className="flex flex-col items-center">
-                        <div
-                          className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                            config?.color || "bg-gray-500"
-                          }`}
-                        >
-                          <IconComponent className="h-4 w-4 text-white" />
-                        </div>
-                        {index < envio.eventos.length - 1 && (
-                          <div className="w-px h-8 bg-border mt-2"></div>
-                        )}
-                      </div>
-                      <div className="flex-1 pb-4">
-                        <div className="flex items-center justify-between mb-1">
-                          <h4 className="font-semibold">
-                            {config?.label || evento.estado}
-                          </h4>
-                          <span className="text-sm text-muted-foreground">
-                            {formatDateTime(
-                              evento.fechaEvento || evento.createdAt
-                            )}
-                          </span>
-                        </div>
-                        <p className="text-sm text-muted-foreground mb-1">
-                          {evento.descripcion}
-                        </p>
-                        {evento.comentario && (
-                          <p className="text-sm text-muted-foreground mb-1">
-                            <strong>Comentario:</strong> {evento.comentario}
-                          </p>
-                        )}
-                        {evento.ubicacion && (
-                          <p className="text-sm text-muted-foreground flex items-center gap-1 mb-1">
-                            <MapPin className="h-3 w-3" /> {evento.ubicacion}
-                          </p>
-                        )}
-                        {evento.direccion && (
-                          <p className="text-sm text-muted-foreground flex items-center gap-1 mb-1">
-                            <Navigation className="h-3 w-3" />
-                            {evento.direccion}
-                          </p>
-                        )}
-                        {evento.responsable &&
-                          evento.responsable !== "Sistema" && (
-                            <p className="text-sm text-muted-foreground">
-                              <strong>Responsable:</strong> {evento.responsable}
-                            </p>
-                          )}
-                        {/* Mostrar archivos adjuntos si existen */}
-                        <div className="flex gap-2 mt-2">
-                          {evento.fotoUrl && (
-                            <a
-                              href={evento.fotoUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded hover:bg-blue-200"
-                            >
-                              📷 Ver foto
-                            </a>
-                          )}
-                          {evento.firmaUrl && (
-                            <a
-                              href={evento.firmaUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded hover:bg-green-200"
-                            >
-                              ✍️ Ver firma
-                            </a>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </CardContent>
-          </Card>
+          <Seguimiento envio={envio} />
         </div>
       )}
       {/* Información de ayuda cuando no hay búsqueda */}

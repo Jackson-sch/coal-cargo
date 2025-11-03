@@ -23,8 +23,6 @@ import {
   Mail,
   FileText,
   Truck,
-  AlertCircle,
-  CheckCircle,
   Loader2,
   Copy,
 } from "lucide-react";
@@ -34,6 +32,10 @@ import {
   convertirCotizacionAEnvio,
 } from "@/lib/actions/cotizaciones";
 import { formatSoles, formatDate } from "@/lib/utils/formatters";
+import {
+  modalidadesObject,
+  tiposServicioObject,
+} from "@/lib/constants/estados";
 import ModalDatosCliente from "./modal-datos-cliente";
 const estadoColors = {
   PENDIENTE: "bg-yellow-100 text-yellow-800",
@@ -49,18 +51,8 @@ const estadoLabels = {
   CONVERTIDA_ENVIO: "Convertida a Envío",
   EXPIRADA: "Expirada",
 };
-const tipoServicioLabels = {
-  NORMAL: "Normal",
-  EXPRESS: "Express",
-  OVERNIGHT: "Overnight",
-  ECONOMICO: "Económico",
-};
-const modalidadLabels = {
-  SUCURSAL_SUCURSAL: "Sucursal a Sucursal",
-  SUCURSAL_DOMICILIO: "Sucursal a Domicilio",
-  DOMICILIO_SUCURSAL: "Domicilio a Sucursal",
-  DOMICILIO_DOMICILIO: "Domicilio a Domicilio",
-};
+const tipoServicioLabels = tiposServicioObject;
+const modalidadLabels = modalidadesObject;
 export default function ModalDetalleCotizacion({
   isOpen,
   onClose,
@@ -232,7 +224,6 @@ export default function ModalDetalleCotizacion({
                     Precio Final
                   </div>
                   <div className="mt-1 inline-flex items-center rounded-md bg-green-50 px-3 py-2 text-green-700 ring-1 ring-inset ring-green-600/20">
-                    <DollarSign className="h-4 w-4 mr-1" />
                     <span className="text-xl font-bold">
                       {formatSoles(cotizacion.precioFinal)}
                     </span>

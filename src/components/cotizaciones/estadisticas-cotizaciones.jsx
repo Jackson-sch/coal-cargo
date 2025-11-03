@@ -12,6 +12,8 @@ import {
   DollarSign,
   Calendar,
 } from "lucide-react";
+import { tiposServicioObject } from "@/lib/constants/estados";
+
 const estadoLabels = {
   PENDIENTE: "Pendiente",
   APROBADA: "Aprobada",
@@ -19,12 +21,7 @@ const estadoLabels = {
   CONVERTIDA_ENVIO: "Convertida a Envío",
   EXPIRADA: "Expirada",
 };
-const tipoServicioLabels = {
-  NORMAL: "Normal",
-  EXPRESS: "Express",
-  OVERNIGHT: "Overnight",
-  ECONOMICO: "Económico",
-};
+const tipoServicioLabels = tiposServicioObject;
 export default function EstadisticasCotizaciones({
   cotizacionesRecientes = [],
 }) {

@@ -49,6 +49,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { formatSoles } from "@/lib/utils/formatters";
 
 const calculadoraSchema = z.object({
   sucursalOrigenId: z.string().min(1, "Selecciona la sucursal de origen"),
@@ -596,7 +597,7 @@ export default function CalculadoraSucursales({ onCotizacionCreada }) {
                   Costo Total
                 </div>
                 <div className="text-3xl font-bold tracking-tight">
-                  S/ {resultado.precioFinal}
+                  {formatSoles(resultado.precioFinal)}
                 </div>
                 <Badge variant="outline" className="mt-2 text-xs">
                   {resultado.tipoTarifa}
@@ -636,7 +637,7 @@ export default function CalculadoraSucursales({ onCotizacionCreada }) {
                   <div className="flex justify-between items-center py-1">
                     <span className="text-muted-foreground">Precio base</span>
                     <span className="font-medium">
-                      S/ {resultado.precioBase}
+                      {formatSoles(resultado.precioBase)}
                     </span>
                   </div>
                   {(resultado.multiplicadorServicio !== 1 ||

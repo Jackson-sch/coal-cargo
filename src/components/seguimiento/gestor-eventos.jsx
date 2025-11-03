@@ -50,27 +50,10 @@ import {
   crearEvento,
   obtenerEventosEnvio,
 } from "@/lib/actions/seguimiento-mejorado";
-import { ESTADOS_ENVIO } from "@/lib/constants/estados";
+import { estadosEnvioArray } from "@/lib/constants/estados";
 import { formatDate } from "@/lib/utils/formatters";
-const estadosDisponibles = [
-  { value: "REGISTRADO", label: "Registrado", color: "bg-blue-500" },
-  { value: "RECOLECTADO", label: "Recolectado", color: "bg-orange-500" },
-  {
-    value: "EN_AGENCIA_ORIGEN",
-    label: "En Agencia Origen",
-    color: "bg-yellow-500",
-  },
-  { value: "EN_TRANSITO", label: "En Tránsito", color: "bg-purple-500" },
-  {
-    value: "EN_AGENCIA_DESTINO",
-    label: "En Agencia Destino",
-    color: "bg-indigo-500",
-  },
-  { value: "EN_REPARTO", label: "En Reparto", color: "bg-cyan-500" },
-  { value: "ENTREGADO", label: "Entregado", color: "bg-green-500" },
-  { value: "DEVUELTO", label: "Devuelto", color: "bg-red-500" },
-  { value: "CANCELADO", label: "Cancelado", color: "bg-gray-500" },
-];
+
+const estadosDisponibles = estadosEnvioArray;
 export default function GestorEventos({ envio, onEventoCreado }) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);

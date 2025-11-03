@@ -13,13 +13,6 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import {
   Card,
   CardContent,
   CardDescription,
@@ -40,7 +33,8 @@ import {
   CheckCircle,
   MapPin,
   Calendar,
-  MoreHorizontal,
+  Edit,
+  User,
   Clock,
   RefreshCw,
   Download,
@@ -49,6 +43,9 @@ import {
   Copy,
   Check,
   FileText,
+  Truck,
+  XCircle,
+  ArrowRight,
 } from "lucide-react";
 import {
   Tooltip,
@@ -56,19 +53,23 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
 import { format, subDays, startOfDay, endOfDay } from "date-fns";
 import { es } from "date-fns/locale";
-import { getEnvios } from "@/lib/actions/envios";
+import {
+  getEnvios,
+  actualizarEstadoEnvio,
+  asignarEnvio,
+} from "@/lib/actions/envios";
+import { getUsuarios } from "@/lib/actions/usuarios";
 import Paginator from "@/components/ui/paginator";
+import ModalDetalle from "@/components/envios/modal-detalle";
+import ModalActualizarEstado from "@/components/envios/modal-actualizar-estado";
+import ModalAsignarUsuario from "@/components/envios/modal-asignar-usuario";
+import { estadosEnvioArray, modalidadesArray } from "@/lib/constants/estados";
+
+const estadosEnvio = estadosEnvioArray;
+const modalidades = modalidadesArray;
 
 export default function EnviosEntregadosPage() {
   const [envios, setEnvios] = useState([]);
@@ -87,12 +88,22 @@ export default function EnviosEntregadosPage() {
 
   // Estados para modales
   const [showDetailModal, setShowDetailModal] = useState(false);
+  const [showStatusModal, setShowStatusModal] = useState(false);
+  const [showAssignModal, setShowAssignModal] = useState(false);
   const [selectedEnvio, setSelectedEnvio] = useState(null);
+  const [usuarios, setUsuarios] = useState([]);
+  const [nuevoEstado, setNuevoEstado] = useState("");
+  const [descripcionEvento, setDescripcionEvento] = useState("");
+  const [ubicacionEvento, setUbicacionEvento] = useState("");
+  const [usuarioAsignado, setUsuarioAsignado] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [fotoUrl, setFotoUrl] = useState("");
+  const [firmaUrl, setFirmaUrl] = useState("");
 
   // Estado para el botón de copia
   const [copiedGuia, setCopiedGuia] = useState(null);
 
-  const itemsPerPage = 10;
+  const itemsPerPage = 8;
 
   // Cargar envíos entregados (memoizado para cumplir exhaustive-deps)
   const fetchEnvios = useCallback(async () => {
@@ -186,7 +197,19 @@ export default function EnviosEntregadosPage() {
 
   useEffect(() => {
     fetchEnvios();
+    cargarUsuarios();
   }, [fetchEnvios]);
+
+  const cargarUsuarios = async () => {
+    try {
+      const result = await getUsuarios();
+      if (result.success) {
+        setUsuarios(result.data);
+      }
+    } catch (error) {
+      console.error("Error al cargar usuarios:", error);
+    }
+  };
 
   // Manejar búsqueda
   const handleSearch = (value) => {
@@ -215,10 +238,78 @@ export default function EnviosEntregadosPage() {
     }
   };
 
-  // Manejar vista de detalles
-  const handleView = (envio) => {
-    setSelectedEnvio(envio);
-    setShowDetailModal(true);
+  const handleUpdateStatus = async () => {
+    if (!selectedEnvio || !nuevoEstado) {
+      toast.error("Complete todos los campos requeridos");
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const result = await actualizarEstadoEnvio(
+        selectedEnvio.id,
+        nuevoEstado,
+        descripcionEvento,
+        ubicacionEvento,
+        fotoUrl || null,
+        firmaUrl || null
+      );
+      if (result.success) {
+        toast.success("Estado actualizado correctamente");
+        setShowStatusModal(false);
+        resetStatusForm();
+        await fetchEnvios();
+      } else {
+        toast.error(result.error);
+      }
+    } catch (error) {
+      toast.error("Error al actualizar estado");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleAssignUser = async () => {
+    if (!selectedEnvio || !usuarioAsignado) {
+      toast.error("Seleccione un usuario válido");
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const result = await asignarEnvio(selectedEnvio.id, usuarioAsignado);
+      if (result.success) {
+        toast.success("Envío asignado correctamente");
+        setShowAssignModal(false);
+        setUsuarioAsignado("");
+        await fetchEnvios();
+      } else {
+        toast.error(result.error);
+      }
+    } catch (error) {
+      toast.error("Error al asignar envío");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const resetStatusForm = () => {
+    setNuevoEstado("");
+    setDescripcionEvento("");
+    setUbicacionEvento("");
+    setFotoUrl("");
+    setFirmaUrl("");
+  };
+
+  const getEstadoBadge = (estado) => {
+    const estadoInfo = estadosEnvio.find((e) => e.value === estado);
+    if (!estadoInfo) return null;
+    const Icon = estadoInfo.icon;
+    return (
+      <Badge className={`${estadoInfo.color} flex items-center gap-1`}>
+        <Icon className="h-3 w-3" /> {estadoInfo.label}
+      </Badge>
+    );
   };
 
   // Calcular tiempo de entrega
@@ -530,30 +621,44 @@ export default function EnviosEntregadosPage() {
                           S/ {envio.total?.toFixed(2)}
                         </div>
                       </TableCell>
-                      <TableCell className="text-right">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" className="h-8 w-8 p-0">
-                              <span className="sr-only">Abrir menú</span>
-                              <MoreHorizontal className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuLabel>Acciones</DropdownMenuLabel>
-                            <DropdownMenuItem onClick={() => handleView(envio)}>
-                              <Eye className="mr-2 h-4 w-4" />
-                              Ver detalles
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem
-                              onClick={() =>
-                                navigator.clipboard.writeText(envio.guia)
-                              }
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              setSelectedEnvio(envio);
+                              setShowDetailModal(true);
+                            }}
+                          >
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              setSelectedEnvio(envio);
+                              setNuevoEstado(envio.estado);
+                              setShowStatusModal(true);
+                            }}
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          {(envio.estado === "REGISTRADO" ||
+                            envio.estado === "EN_BODEGA") && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                setSelectedEnvio(envio);
+                                setUsuarioAsignado(envio.asignadoA || "");
+                                setShowAssignModal(true);
+                              }}
                             >
-                              Copiar guía
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
+                              <User className="h-4 w-4" />
+                            </Button>
+                          )}
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -568,6 +673,7 @@ export default function EnviosEntregadosPage() {
               currentPage={currentPage}
               totalPages={totalPages}
               onPageChange={setCurrentPage}
+              limit={itemsPerPage}
               total={totalEnvios}
               entityLabel="envíos"
             />
@@ -575,266 +681,50 @@ export default function EnviosEntregadosPage() {
         </CardContent>
       </Card>
 
-      {/* Modal de detalles */}
-      <Dialog open={showDetailModal} onOpenChange={setShowDetailModal}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Detalles del Envío Entregado</DialogTitle>
-            <DialogDescription>
-              Información completa del envío {selectedEnvio?.guia}
-            </DialogDescription>
-          </DialogHeader>
-          {selectedEnvio && (
-            <div className="space-y-6">
-              {/* Información básica */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-lg flex items-center gap-2">
-                      <CheckCircle className="h-5 w-5 text-green-600" />
-                      Información del Envío
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-2">
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Guía:</span>
-                      <span className="font-medium">{selectedEnvio.guia}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Estado:</span>
-                      <Badge className="bg-green-100 text-green-800">
-                        <CheckCircle className="h-3 w-3 mr-1" />
-                        Entregado
-                      </Badge>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">
-                        Fecha Registro:
-                      </span>
-                      <span>
-                        {format(
-                          new Date(selectedEnvio.fechaRegistro),
-                          "dd/MM/yyyy HH:mm",
-                          { locale: es }
-                        )}
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">
-                        Fecha Entrega:
-                      </span>
-                      <span>
-                        {selectedEnvio.fechaEntrega
-                          ? format(
-                              new Date(selectedEnvio.fechaEntrega),
-                              "dd/MM/yyyy HH:mm",
-                              { locale: es }
-                            )
-                          : "No especificada"}
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">
-                        Tiempo de Entrega:
-                      </span>
-                      <span>
-                        {calcularTiempoEntrega(
-                          selectedEnvio.fechaRegistro,
-                          selectedEnvio.fechaEntrega
-                        )}
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Total:</span>
-                      <span className="font-medium">
-                        S/ {selectedEnvio.total?.toFixed(2)}
-                      </span>
-                    </div>
-                  </CardContent>
-                </Card>
+      {/* Modal Detalle de Envío */}
+      <ModalDetalle
+        open={showDetailModal}
+        onOpenChange={setShowDetailModal}
+        envio={selectedEnvio}
+        getEstadoBadge={getEstadoBadge}
+        modalidades={modalidades}
+      />
 
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-lg">Ruta de Entrega</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-2">
-                    <div>
-                      <span className="text-muted-foreground">Origen:</span>
-                      <div className="font-medium">
-                        {selectedEnvio.sucursalOrigen?.nombre}
-                      </div>
-                      <div className="text-sm text-muted-foreground">
-                        {selectedEnvio.sucursalOrigen?.provincia?.nombre}
-                      </div>
-                    </div>
-                    <div className="flex justify-center py-2">
-                      <div className="text-muted-foreground">↓</div>
-                    </div>
-                    <div>
-                      <span className="text-muted-foreground">Destino:</span>
-                      <div className="font-medium">
-                        {selectedEnvio.sucursalDestino?.nombre}
-                      </div>
-                      <div className="text-sm text-muted-foreground">
-                        {selectedEnvio.sucursalDestino?.provincia?.nombre}
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
+      {/* Modal Actualizar Estado */}
+      <ModalActualizarEstado
+        open={showStatusModal}
+        onOpenChange={setShowStatusModal}
+        envio={selectedEnvio}
+        getEstadoBadge={getEstadoBadge}
+        modalidades={modalidades}
+        estadosEnvio={estadosEnvio}
+        setShowStatusModal={setShowStatusModal}
+        handleUpdateStatus={handleUpdateStatus}
+        saving={saving}
+        nuevoEstado={nuevoEstado}
+        setNuevoEstado={setNuevoEstado}
+        descripcionEvento={descripcionEvento}
+        setDescripcionEvento={setDescripcionEvento}
+        ubicacionEvento={ubicacionEvento}
+        setUbicacionEvento={setUbicacionEvento}
+        fotoUrl={fotoUrl}
+        setFotoUrl={setFotoUrl}
+        firmaUrl={firmaUrl}
+        setFirmaUrl={setFirmaUrl}
+      />
 
-              {/* Información de personas */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-lg">Remitente</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-2">
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Nombre:</span>
-                      <span className="font-medium">
-                        {selectedEnvio?.cliente?.tipoDocumento === "RUC"
-                          ? selectedEnvio?.cliente?.razonSocial ||
-                            selectedEnvio?.remitenteNombre ||
-                            "No especificado"
-                          : selectedEnvio?.remitenteNombre || "No especificado"}
-                      </span>
-                    </div>
-                    {selectedEnvio?.cliente?.tipoDocumento &&
-                      (selectedEnvio?.cliente?.numeroDocumento ||
-                        selectedEnvio?.cliente?.ruc) && (
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">
-                            Documento:
-                          </span>
-                          <span className="font-medium">
-                            {selectedEnvio.cliente.tipoDocumento}:
-                            {selectedEnvio.cliente.tipoDocumento === "RUC"
-                              ? selectedEnvio.cliente.ruc ||
-                                selectedEnvio.cliente.numeroDocumento
-                              : selectedEnvio.cliente.numeroDocumento}
-                          </span>
-                        </div>
-                      )}
-                    {selectedEnvio.remitenteTelefono && (
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Teléfono:</span>
-                        <span>{selectedEnvio.remitenteTelefono}</span>
-                      </div>
-                    )}
-                    {selectedEnvio.remitenteEmail && (
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Email:</span>
-                        <span>{selectedEnvio.remitenteEmail}</span>
-                      </div>
-                    )}
-                    {(selectedEnvio.modalidad === "DOMICILIO_SUCURSAL" ||
-                      selectedEnvio.modalidad === "DOMICILIO_DOMICILIO") &&
-                      selectedEnvio.remitenteDireccion && (
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">
-                            Dirección:
-                          </span>
-                          <span>{selectedEnvio.remitenteDireccion}</span>
-                        </div>
-                      )}
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-lg">Destinatario</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-2">
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Nombre:</span>
-                      <span className="font-medium">
-                        {selectedEnvio.destinatarioNombre || "No especificado"}
-                      </span>
-                    </div>
-                    {selectedEnvio.destinatarioTelefono && (
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Teléfono:</span>
-                        <span>{selectedEnvio.destinatarioTelefono}</span>
-                      </div>
-                    )}
-                    {selectedEnvio.destinatarioEmail && (
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Email:</span>
-                        <span>{selectedEnvio.destinatarioEmail}</span>
-                      </div>
-                    )}
-                    {(selectedEnvio.modalidad === "SUCURSAL_DOMICILIO" ||
-                      selectedEnvio.modalidad === "DOMICILIO_DOMICILIO") &&
-                      selectedEnvio.destinatarioDireccion && (
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">
-                            Dirección:
-                          </span>
-                          <span>{selectedEnvio.destinatarioDireccion}</span>
-                        </div>
-                      )}
-                  </CardContent>
-                </Card>
-              </div>
-
-              {/* Información del paquete */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg">
-                    Información del Paquete
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <div>
-                      <span className="text-muted-foreground text-sm">
-                        Peso:
-                      </span>
-                      <div className="font-medium">{selectedEnvio.peso} kg</div>
-                    </div>
-                    <div>
-                      <span className="text-muted-foreground text-sm">
-                        Dimensiones:
-                      </span>
-                      <div className="font-medium">
-                        {selectedEnvio.largo}×{selectedEnvio.ancho}×
-                        {selectedEnvio.alto} cm
-                      </div>
-                    </div>
-                    <div>
-                      <span className="text-muted-foreground text-sm">
-                        Volumen:
-                      </span>
-                      <div className="font-medium">
-                        {selectedEnvio.volumen?.toFixed(4)} m³
-                      </div>
-                    </div>
-                    <div>
-                      <span className="text-muted-foreground text-sm">
-                        Valor Declarado:
-                      </span>
-                      <div className="font-medium">
-                        S/ {selectedEnvio.valorDeclarado?.toFixed(2) || "0.00"}
-                      </div>
-                    </div>
-                  </div>
-                  {selectedEnvio.descripcion && (
-                    <div className="mt-4">
-                      <span className="text-muted-foreground text-sm">
-                        Descripción:
-                      </span>
-                      <div className="font-medium">
-                        {selectedEnvio.descripcion}
-                      </div>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
-    </div>
+      {/* Modal Asignar Usuario */}
+      <ModalAsignarUsuario
+        open={showAssignModal}
+        onOpenChange={setShowAssignModal}
+        envio={selectedEnvio}
+        usuarios={usuarios}
+        usuarioAsignado={usuarioAsignado}
+        setUsuarioAsignado={setUsuarioAsignado}
+        handleAssignUser={handleAssignUser}
+        saving={saving}
+        setShowAssignModal={setShowAssignModal}
+      />
+      </div>
   );
 }

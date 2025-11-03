@@ -99,7 +99,7 @@ export default function UsuariosSucursalesClient() {
     email: "",
     password: "",
     role: "",
-    phone: "",
+    telefono: "",
     sucursalId: "",
   });
 
@@ -137,7 +137,7 @@ export default function UsuariosSucursalesClient() {
         email: usuario.email || "",
         password: "",
         role: usuario.role || "",
-        phone: usuario.phone || "",
+        telefono: usuario.phone || "",
         sucursalId: usuario.sucursalId || "",
       });
     } else {
@@ -147,7 +147,7 @@ export default function UsuariosSucursalesClient() {
         email: "",
         password: "",
         role: "",
-        phone: "",
+        telefono: "",
         sucursalId: "",
       });
     }
@@ -162,7 +162,7 @@ export default function UsuariosSucursalesClient() {
       email: "",
       password: "",
       role: "",
-      phone: "",
+      telefono: "",
       sucursalId: "",
     });
   };
@@ -533,9 +533,9 @@ export default function UsuariosSucursalesClient() {
                 </Label>
                 <Input
                   id="phone"
-                  value={formData.phone}
+                  value={formData.telefono}
                   onChange={(e) =>
-                    setFormData({ ...formData, phone: e.target.value })
+                    setFormData({ ...formData, telefono: e.target.value })
                   }
                   className="col-span-3"
                 />

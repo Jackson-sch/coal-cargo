@@ -1,112 +1,135 @@
-// lib/constants/estados.j s
-const ESTADOS_ENVIO = {
+import {
+  Clock,
+  Package,
+  Truck,
+  Building,
+  MapPin,
+  CheckCircle,
+  AlertCircle,
+  FileText,
+  Navigation,
+  ArrowRight,
+  XCircle,
+} from "lucide-react";
+
+// Configuración base de estados para envíos
+const ESTADOS_ENVIO_BASE = {
   REGISTRADO: {
     label: "Registrado",
-    description: "Envío registrado en sistema",
-    color: "blue",
-    icon: "FileText",
+    icon: FileText,
+    color: "bg-yellow-100 text-yellow-800",
+    description: "El envío ha sido registrado en el sistema",
+  },
+  EN_BODEGA: {
+    label: "En Bodega",
+    icon: Package,
+    color: "bg-blue-100 text-blue-800",
+    description: "El paquete está en bodega",
   },
   RECOLECTADO: {
     label: "Recolectado",
-    description: "Paquete recolectado",
-    color: "orange",
-    icon: "Package",
+    icon: Package,
+    color: "bg-orange-100 text-orange-800",
+    description: "El paquete ha sido recolectado",
   },
   EN_AGENCIA_ORIGEN: {
-    label: "En Agencia",
-    description: "En agencia de origen",
-    color: "purple",
-    icon: "Building",
+    label: "En Agencia Origen",
+    icon: Building,
+    color: "bg-blue-100 text-blue-800",
+    description: "El paquete está en la agencia de origen",
   },
   EN_TRANSITO: {
     label: "En Tránsito",
-    description: "En camino al destino",
-    color: "yellow",
-    icon: "Truck",
+    icon: Truck,
+    color: "bg-purple-100 text-purple-800",
+    description: "El paquete está en camino al destino",
   },
   EN_AGENCIA_DESTINO: {
-    label: "En Destino",
-    description: "Llegó a agencia destino",
-    color: "indigo",
-    icon: "MapPin",
+    label: "En Agencia Destino",
+    icon: Building,
+    color: "bg-purple-100 text-purple-800",
+    description: "El paquete ha llegado a la agencia de destino",
   },
   EN_REPARTO: {
     label: "En Reparto",
-    description: "En proceso de entrega",
-    color: "cyan",
-    icon: "Navigation",
+    icon: MapPin,
+    color: "bg-indigo-100 text-indigo-800",
+    description: "El paquete está siendo entregado",
   },
   ENTREGADO: {
     label: "Entregado",
-    description: "Entregado exitosamente",
-    color: "green",
-    icon: "CheckCircle",
+    icon: CheckCircle,
+    color: "bg-green-100 text-green-800",
+    description: "El paquete ha sido entregado exitosamente",
   },
   DEVUELTO: {
     label: "Devuelto",
-    description: "Devuelto al remitente",
-    color: "red",
-    icon: "RotateCcw",
-  },
-  EXTRAVIADO: {
-    label: "Extraviado",
-    description: "Reportado como extraviado",
-    color: "red",
-    icon: "AlertTriangle",
+    icon: ArrowRight,
+    color: "bg-orange-100 text-orange-800",
+    description: "El paquete ha sido devuelto",
   },
   ANULADO: {
     label: "Anulado",
-    description: "Envío anulado",
-    color: "gray",
-    icon: "X",
+    icon: XCircle,
+    color: "bg-red-100 text-red-800",
+    description: "El envío ha sido anulado",
+  },
+  CANCELADO: {
+    label: "Cancelado",
+    icon: AlertCircle,
+    color: "bg-gray-100 text-gray-800",
+    description: "El envío ha sido cancelado",
   },
 };
-const TIPOS_SERVICIO = {
-  NORMAL: {
-    label: "Normal",
-    description: "Entrega en 3-5 días",
-    factor: 1.0,
-    icon: "Clock",
-  },
-  EXPRESS: {
-    label: "Express",
-    description: "Entrega en 1-2 días",
-    factor: 1.5,
-    icon: "Zap",
-  },
-  OVERNIGHT: {
-    label: "Overnight",
-    description: "Entrega en 24 horas",
-    factor: 2.0,
-    icon: "Moon",
-  },
-  ECONOMICO: {
-    label: "Económico",
-    description: "Entrega en 5-7 días",
-    factor: 0.8,
-    icon: "DollarSign",
-  },
+
+// Configuración base de modalidades
+const MODALIDADES_BASE = {
+  SUCURSAL_SUCURSAL: "Sucursal a Sucursal",
+  SUCURSAL_DOMICILIO: "Sucursal a Domicilio",
+  DOMICILIO_SUCURSAL: "Domicilio a Sucursal",
+  DOMICILIO_DOMICILIO: "Domicilio a Domicilio",
 };
-const MODALIDADES = {
-  SUCURSAL_SUCURSAL: {
-    label: "Sucursal a Sucursal",
-    description: "Entrega y recojo en sucursal",
-    icon: "Building2",
-  },
-  DOMICILIO_SUCURSAL: {
-    label: "Domicilio a Sucursal",
-    description: "Recojo a domicilio, entrega en sucursal",
-    icon: "Home",
-  },
-  SUCURSAL_DOMICILIO: {
-    label: "Sucursal a Domicilio",
-    description: "Entrega en sucursal, entrega a domicilio",
-    icon: "Building",
-  },
-  DOMICILIO_DOMICILIO: {
-    label: "Domicilio a Domicilio",
-    description: "Recojo y entrega a domicilio",
-    icon: "Truck",
-  },
+
+// Configuración base de tipos de servicio
+const TIPOS_SERVICIO_BASE = {
+  NORMAL: "Normal",
+  EXPRESS: "Express",
+  OVERNIGHT: "Overnight",
+  ECONOMICO: "Económico",
 };
-export default { ESTADOS_ENVIO, TIPOS_SERVICIO, MODALIDADES };
+
+// Formato para arrays (usado en Select, Filtros, etc.)
+export const estadosEnvioArray = Object.keys(ESTADOS_ENVIO_BASE).map(
+  (key) => ({
+    value: key,
+    label: ESTADOS_ENVIO_BASE[key].label,
+    color: ESTADOS_ENVIO_BASE[key].color,
+    icon: ESTADOS_ENVIO_BASE[key].icon,
+  })
+);
+
+// Formato para objetos (usado en seguimiento, configuración, etc.)
+export const estadosEnvioObject = ESTADOS_ENVIO_BASE;
+
+// Formato simple para modalidades
+export const modalidadesArray = Object.keys(MODALIDADES_BASE).map((key) => ({
+  value: key,
+  label: MODALIDADES_BASE[key],
+}));
+
+export const modalidadesObject = MODALIDADES_BASE;
+
+// Formato simple para tipos de servicio
+export const tiposServicioObject = TIPOS_SERVICIO_BASE;
+
+// Exportar todo junto para compatibilidad
+export default {
+  estadosEnvioArray,
+  estadosEnvioObject,
+  modalidadesArray,
+  modalidadesObject,
+  tiposServicioObject,
+  ESTADOS_ENVIO: estadosEnvioObject,
+  MODALIDADES: modalidadesObject,
+  TIPOS_SERVICIO: tiposServicioObject,
+};

@@ -37,7 +37,7 @@ export default function RutaServicioTab({ form, sucursales = [] }) {
               <FormLabel>Tipo de servicio</FormLabel>
               <FormControl>
                 <Select value={field.value} onValueChange={field.onChange}>
-                  <SelectTrigger>
+                  <SelectTrigger className="w-full">
                     <SelectValue placeholder="Selecciona tipo" />
                   </SelectTrigger>
                   <SelectContent>
@@ -61,7 +61,7 @@ export default function RutaServicioTab({ form, sucursales = [] }) {
               <FormLabel>Modalidad</FormLabel>
               <FormControl>
                 <Select value={field.value} onValueChange={field.onChange}>
-                  <SelectTrigger>
+                  <SelectTrigger className="w-full">
                     <SelectValue placeholder="Selecciona modalidad" />
                   </SelectTrigger>
                   <SelectContent>
@@ -95,7 +95,7 @@ export default function RutaServicioTab({ form, sucursales = [] }) {
               <FormLabel>Sucursal Origen</FormLabel>
               <FormControl>
                 <Select value={field.value} onValueChange={field.onChange}>
-                  <SelectTrigger>
+                  <SelectTrigger className="w-full">
                     <SelectValue placeholder="Selecciona origen" />
                   </SelectTrigger>
                   <SelectContent>
@@ -120,7 +120,7 @@ export default function RutaServicioTab({ form, sucursales = [] }) {
               <FormLabel>Sucursal Destino</FormLabel>
               <FormControl>
                 <Select value={field.value} onValueChange={field.onChange}>
-                  <SelectTrigger>
+                  <SelectTrigger className="w-full">
                     <SelectValue placeholder="Selecciona destino" />
                   </SelectTrigger>
                   <SelectContent>

@@ -161,32 +161,24 @@ export default function FacturacionTab({ form }) {
   }, [rucValue, esEmpresa]);
   return (
     <div className="space-y-6">
-      
       <div className="flex items-center gap-2 pb-2 border-b">
-        
         <Building className="h-5 w-5" />
         <h3 className="font-semibold text-lg">Cliente de Facturación</h3>
       </div>
       {/* Documento arriba */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        
         <FormField
           control={form.control}
           name="clienteFacturacion.tipoDocumento"
           render={({ field }) => (
             <FormItem>
-              
               <FormLabel>Tipo de documento</FormLabel>
               <FormControl>
-                
                 <Select value={field.value} onValueChange={field.onChange}>
-                  
-                  <SelectTrigger>
-                    
+                  <SelectTrigger className="w-full">
                     <SelectValue placeholder="Selecciona tipo" />
                   </SelectTrigger>
                   <SelectContent>
-                    
                     <SelectItem value="DNI">DNI</SelectItem>
                     <SelectItem value="RUC">RUC</SelectItem>
                     <SelectItem value="PASAPORTE">Pasaporte</SelectItem>
@@ -205,25 +197,20 @@ export default function FacturacionTab({ form }) {
           name="clienteFacturacion.numeroDocumento"
           render={({ field }) => (
             <FormItem>
-              
               <FormLabel>
-                
                 Número de documento
                 {buscandoCliente && (
                   <span className="text-xs text-muted-foreground inline-flex items-center gap-1 ml-2">
-                    
                     <Loader2 className="h-3 w-3 animate-spin" /> Buscando...
                   </span>
                 )}
                 {clienteEncontrado && !buscandoCliente && (
                   <span className="text-xs text-green-600 inline-flex items-center gap-1 ml-2">
-                    
                     <CheckCircle className="h-3 w-3" /> Cliente encontrado
                   </span>
                 )}
               </FormLabel>
               <FormControl>
-                
                 <Input
                   placeholder={
                     tipoDocumento === "RUC" ? "20123456789" : "12345678"
@@ -253,9 +240,7 @@ export default function FacturacionTab({ form }) {
         name="clienteFacturacion.esEmpresa"
         render={({ field }) => (
           <FormItem className="flex items-center gap-3">
-            
             <FormControl>
-              
               <Switch
                 checked={!!field.value}
                 onCheckedChange={field.onChange}
@@ -268,16 +253,13 @@ export default function FacturacionTab({ form }) {
       />
       {esEmpresa ? (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          
           <FormField
             control={form.control}
             name="clienteFacturacion.razonSocial"
             render={({ field }) => (
               <FormItem>
-                
                 <FormLabel>Razón Social</FormLabel>
                 <FormControl>
-                  
                   <Input placeholder="Razón Social" {...field} />
                 </FormControl>
                 <FormMessage />
@@ -289,10 +271,8 @@ export default function FacturacionTab({ form }) {
             name="clienteFacturacion.ruc"
             render={({ field }) => (
               <FormItem>
-                
                 <FormLabel>RUC</FormLabel>
                 <FormControl>
-                  
                   <Input
                     placeholder="11 dígitos"
                     inputMode="numeric"
@@ -312,16 +292,13 @@ export default function FacturacionTab({ form }) {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          
           <FormField
             control={form.control}
             name="clienteFacturacion.nombre"
             render={({ field }) => (
               <FormItem>
-                
                 <FormLabel>Nombre</FormLabel>
                 <FormControl>
-                  
                   <Input placeholder="Nombre" {...field} />
                 </FormControl>
                 <FormMessage />
@@ -333,10 +310,8 @@ export default function FacturacionTab({ form }) {
             name="clienteFacturacion.apellidos"
             render={({ field }) => (
               <FormItem>
-                
                 <FormLabel>Apellidos</FormLabel>
                 <FormControl>
-                  
                   <Input placeholder="Apellidos" {...field} />
                 </FormControl>
                 <FormMessage />
@@ -346,16 +321,13 @@ export default function FacturacionTab({ form }) {
         </div>
       )}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        
         <FormField
           control={form.control}
           name="clienteFacturacion.email"
           render={({ field }) => (
             <FormItem>
-              
               <FormLabel>Email</FormLabel>
               <FormControl>
-                
                 <Input placeholder="correo@dominio.com" {...field} />
               </FormControl>
               <FormMessage />
@@ -367,10 +339,8 @@ export default function FacturacionTab({ form }) {
           name="clienteFacturacion.telefono"
           render={({ field }) => (
             <FormItem>
-              
               <FormLabel>Teléfono</FormLabel>
               <FormControl>
-                
                 <Input placeholder="9XXXXXXXX" {...field} />
               </FormControl>
               <FormMessage />
@@ -383,10 +353,8 @@ export default function FacturacionTab({ form }) {
         name="clienteFacturacion.direccion"
         render={({ field }) => (
           <FormItem>
-            
             <FormLabel>Dirección</FormLabel>
             <FormControl>
-              
               <Input placeholder="Calle y número" {...field} />
             </FormControl>
             <FormMessage />

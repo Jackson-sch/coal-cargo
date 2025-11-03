@@ -54,6 +54,7 @@ export default function FormularioEnvioV2({
     "remitente",
     "recojo",
     "facturacion",
+    "resumen",
   ];
 
   // ----------------------
@@ -144,7 +145,11 @@ export default function FormularioEnvioV2({
   ]);
 
   const goNext = useCallback(() => {
-    setCurrentStep((prev) => Math.min(prev + 1, steps.length - 1));
+    setCurrentStep((prev) => {
+      const nextStep = prev + 1;
+      const maxStep = steps.length - 1;
+      return Math.min(nextStep, maxStep);
+    });
   }, [steps.length]);
 
   const goPrev = useCallback(() => {
@@ -197,6 +202,7 @@ export default function FormularioEnvioV2({
 
       if (errors?.clienteFacturacion) {
         setCurrentStep(5);
+        return;
       }
     } catch {}
   }, []);
@@ -204,8 +210,6 @@ export default function FormularioEnvioV2({
   const handleSubmit = useCallback(
     async (values) => {
       try {
-        setLoading(true);
-
         // Validación previa del lado cliente
         const erroresValidacion = [];
 
@@ -264,6 +268,8 @@ export default function FormularioEnvioV2({
           });
           return;
         }
+
+        setLoading(true);
 
         const paquete = values.paquete || {};
         const pesoFinal = paquete.peso || 0;
@@ -395,13 +401,25 @@ export default function FormularioEnvioV2({
         setLoading(false);
       }
     },
-    [form, onSubmitProp]
+    [
+      form,
+      onSubmitProp,
+      incluirRemitente,
+      incluirResponsableRecojo,
+      incluirClienteFacturacion,
+    ]
   );
 
   return (
     <Form {...form}>
       <form
         onSubmit={form.handleSubmit(handleSubmit, handleFormError)}
+        onKeyDown={(e) => {
+          // Prevenir submit con Enter si no estamos en el último paso
+          if (e.key === "Enter" && currentStep < steps.length - 1) {
+            e.preventDefault();
+          }
+        }}
         className="space-y-6"
       >
         <div className="flex items-center gap-2 pb-2 border-b">
@@ -416,7 +434,7 @@ export default function FormularioEnvioV2({
 
         {/* Resumen arriba */}
         <Card className="bg-primary/5 border-primary/20">
-          <CardHeader className="py-3">
+          <CardHeader>
             <CardTitle className="text-sm">Resumen de envío</CardTitle>
           </CardHeader>
           <CardContent className="text-sm grid grid-cols-1 md:grid-cols-3 gap-3">
@@ -574,7 +592,7 @@ export default function FormularioEnvioV2({
                         value={field.value}
                         onValueChange={field.onChange}
                       >
-                        <SelectTrigger>
+                        <SelectTrigger className="w-full">
                           <SelectValue placeholder="Selecciona" />
                         </SelectTrigger>
                         <SelectContent>
@@ -601,7 +619,7 @@ export default function FormularioEnvioV2({
                         value={field.value}
                         onValueChange={field.onChange}
                       >
-                        <SelectTrigger>
+                        <SelectTrigger className="w-full">
                           <SelectValue placeholder="Selecciona" />
                         </SelectTrigger>
                         <SelectContent>
@@ -631,6 +649,183 @@ export default function FormularioEnvioV2({
             </div>
 
             {incluirClienteFacturacion && <FacturacionTab form={form} />}
+          </div>
+        )}
+
+        {currentStep === 6 && (
+          <div className="pt-4 space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">Resumen del Envío</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {/* Ruta y Servicio */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <h4 className="font-semibold mb-2">Ruta</h4>
+                    <div className="space-y-1 text-sm">
+                      <p>
+                        <span className="text-muted-foreground">Origen:</span>{" "}
+                        {sucursales.find(
+                          (s) => s.id === form.watch("sucursalOrigenId")
+                        )?.nombre || "—"}
+                      </p>
+                      <p>
+                        <span className="text-muted-foreground">Destino:</span>{" "}
+                        {sucursales.find(
+                          (s) => s.id === form.watch("sucursalDestinoId")
+                        )?.nombre || "—"}
+                      </p>
+                      <p>
+                        <span className="text-muted-foreground">Servicio:</span>{" "}
+                        {form.watch("tipoServicio")} · {form.watch("modalidad")}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Costo */}
+                  <div>
+                    <h4 className="font-semibold mb-2">Costo</h4>
+                    <div className="text-sm space-y-1">
+                      {resumenTotal != null ? (
+                        <p className="text-2xl font-bold text-primary">
+                          S/ {resumenTotal.toFixed(2)}
+                        </p>
+                      ) : (
+                        <p className="text-muted-foreground">No calculado</p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Paquete */}
+                <div className="border-t pt-4">
+                  <h4 className="font-semibold mb-2">Paquete</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <p>
+                        <span className="text-muted-foreground">Peso:</span>{" "}
+                        {form.watch("paquete.peso")} kg
+                      </p>
+                      {form.watch("paquete.alto") &&
+                        form.watch("paquete.ancho") &&
+                        form.watch("paquete.profundo") && (
+                          <p>
+                            <span className="text-muted-foreground">
+                              Dimensiones:
+                            </span>{" "}
+                            {form.watch("paquete.ancho")} ×{" "}
+                            {form.watch("paquete.alto")} ×{" "}
+                            {form.watch("paquete.profundo")} cm
+                          </p>
+                        )}
+                      {form.watch("paquete.valorDeclarado") && (
+                        <p>
+                          <span className="text-muted-foreground">
+                            Valor declarado:
+                          </span>{" "}
+                          S/{" "}
+                          {parseFloat(
+                            form.watch("paquete.valorDeclarado")
+                          ).toFixed(2)}
+                        </p>
+                      )}
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground mb-1">Descripción:</p>
+                      <p>{form.watch("paquete.descripcion")}</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Destinatario */}
+                <div className="border-t pt-4">
+                  <h4 className="font-semibold mb-2">Destinatario</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <p>
+                        <span className="text-muted-foreground">Nombre:</span>{" "}
+                        {form.watch("destinatario.nombre")}
+                      </p>
+                      <p>
+                        <span className="text-muted-foreground">Teléfono:</span>{" "}
+                        {form.watch("destinatario.telefono")}
+                      </p>
+                      {form.watch("destinatario.email") && (
+                        <p>
+                          <span className="text-muted-foreground">Email:</span>{" "}
+                          {form.watch("destinatario.email")}
+                        </p>
+                      )}
+                    </div>
+                    {(form.watch("destinatario.direccion") ||
+                      form.watch("direccionEntrega")) && (
+                      <div>
+                        <p className="text-muted-foreground mb-1">Dirección:</p>
+                        <p>
+                          {form.watch("destinatario.direccion") ||
+                            form.watch("direccionEntrega")}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Remitente (si está incluido) */}
+                {incluirRemitente && (
+                  <div className="border-t pt-4">
+                    <h4 className="font-semibold mb-2">Remitente</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                      <div>
+                        <p>
+                          <span className="text-muted-foreground">Nombre:</span>{" "}
+                          {form.watch("remitente.nombre")}
+                        </p>
+                        <p>
+                          <span className="text-muted-foreground">
+                            Teléfono:
+                          </span>{" "}
+                          {form.watch("remitente.telefono")}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Facturación */}
+                <div className="border-t pt-4">
+                  <h4 className="font-semibold mb-2">Facturación</h4>
+                  <div className="text-sm space-y-1">
+                    <p>
+                      <span className="text-muted-foreground">Quién paga:</span>{" "}
+                      {form.watch("quienPaga") === "REMITENTE"
+                        ? "Remitente"
+                        : "Destinatario"}
+                    </p>
+                    <p>
+                      <span className="text-muted-foreground">Facturar a:</span>{" "}
+                      {form.watch("facturarA") === "REMITENTE"
+                        ? "Remitente"
+                        : form.watch("facturarA") === "DESTINATARIO"
+                        ? "Destinatario"
+                        : "Tercero"}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Instrucciones especiales (si hay) */}
+                {form.watch("instruccionesEspeciales") && (
+                  <div className="border-t pt-4">
+                    <h4 className="font-semibold mb-2">
+                      Instrucciones especiales
+                    </h4>
+                    <p className="text-sm">
+                      {form.watch("instruccionesEspeciales")}
+                    </p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           </div>
         )}
 

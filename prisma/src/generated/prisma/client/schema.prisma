@@ -325,7 +325,7 @@ model tarifas_sucursales {
 }
 
 model usuarios {
-  id                  String                @id
+  id                  String                @id @default(cuid())
   email               String                @unique
   password            String
   sucursalId          String?
@@ -560,6 +560,8 @@ enum EstadoEnvio {
   REGISTRADO
   EN_BODEGA
   EN_TRANSITO
+  EN_AGENCIA_ORIGEN
+  EN_AGENCIA_DESTINO
   EN_REPARTO
   ENTREGADO
   DEVUELTO

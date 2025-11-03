@@ -239,6 +239,8 @@ export const EstadoEnvio: {
   REGISTRADO: 'REGISTRADO',
   EN_BODEGA: 'EN_BODEGA',
   EN_TRANSITO: 'EN_TRANSITO',
+  EN_AGENCIA_ORIGEN: 'EN_AGENCIA_ORIGEN',
+  EN_AGENCIA_DESTINO: 'EN_AGENCIA_DESTINO',
   EN_REPARTO: 'EN_REPARTO',
   ENTREGADO: 'ENTREGADO',
   DEVUELTO: 'DEVUELTO',
@@ -49708,7 +49710,7 @@ export namespace Prisma {
   }
 
   export type usuariosCreateInput = {
-    id: string
+    id?: string
     email: string
     password: string
     createdAt?: Date | string
@@ -49732,7 +49734,7 @@ export namespace Prisma {
   }
 
   export type usuariosUncheckedCreateInput = {
-    id: string
+    id?: string
     email: string
     password: string
     sucursalId?: string | null
@@ -49804,7 +49806,7 @@ export namespace Prisma {
   }
 
   export type usuariosCreateManyInput = {
-    id: string
+    id?: string
     email: string
     password: string
     sucursalId?: string | null
@@ -58499,7 +58501,7 @@ export namespace Prisma {
   }
 
   export type usuariosCreateWithoutAccountsInput = {
-    id: string
+    id?: string
     email: string
     password: string
     createdAt?: Date | string
@@ -58522,7 +58524,7 @@ export namespace Prisma {
   }
 
   export type usuariosUncheckedCreateWithoutAccountsInput = {
-    id: string
+    id?: string
     email: string
     password: string
     sucursalId?: string | null
@@ -59715,7 +59717,7 @@ export namespace Prisma {
   }
 
   export type usuariosCreateWithoutEnviosInput = {
-    id: string
+    id?: string
     email: string
     password: string
     createdAt?: Date | string
@@ -59738,7 +59740,7 @@ export namespace Prisma {
   }
 
   export type usuariosUncheckedCreateWithoutEnviosInput = {
-    id: string
+    id?: string
     email: string
     password: string
     sucursalId?: string | null
@@ -60624,7 +60626,7 @@ export namespace Prisma {
   }
 
   export type usuariosCreateWithoutEventosInput = {
-    id: string
+    id?: string
     email: string
     password: string
     createdAt?: Date | string
@@ -60647,7 +60649,7 @@ export namespace Prisma {
   }
 
   export type usuariosUncheckedCreateWithoutEventosInput = {
-    id: string
+    id?: string
     email: string
     password: string
     sucursalId?: string | null
@@ -61179,7 +61181,7 @@ export namespace Prisma {
   }
 
   export type usuariosCreateWithoutSessionsInput = {
-    id: string
+    id?: string
     email: string
     password: string
     createdAt?: Date | string
@@ -61202,7 +61204,7 @@ export namespace Prisma {
   }
 
   export type usuariosUncheckedCreateWithoutSessionsInput = {
-    id: string
+    id?: string
     email: string
     password: string
     sucursalId?: string | null
@@ -61795,7 +61797,7 @@ export namespace Prisma {
   }
 
   export type usuariosCreateWithoutSucursalesInput = {
-    id: string
+    id?: string
     email: string
     password: string
     createdAt?: Date | string
@@ -61818,7 +61820,7 @@ export namespace Prisma {
   }
 
   export type usuariosUncheckedCreateWithoutSucursalesInput = {
-    id: string
+    id?: string
     email: string
     password: string
     createdAt?: Date | string
@@ -63802,7 +63804,7 @@ export namespace Prisma {
   }
 
   export type usuariosCreateWithoutVehiculosInput = {
-    id: string
+    id?: string
     email: string
     password: string
     createdAt?: Date | string
@@ -63825,7 +63827,7 @@ export namespace Prisma {
   }
 
   export type usuariosUncheckedCreateWithoutVehiculosInput = {
-    id: string
+    id?: string
     email: string
     password: string
     sucursalId?: string | null
@@ -63995,7 +63997,7 @@ export namespace Prisma {
   }
 
   export type usuariosCreateWithoutPermisosInput = {
-    id: string
+    id?: string
     email: string
     password: string
     createdAt?: Date | string
@@ -64018,7 +64020,7 @@ export namespace Prisma {
   }
 
   export type usuariosUncheckedCreateWithoutPermisosInput = {
-    id: string
+    id?: string
     email: string
     password: string
     sucursalId?: string | null
@@ -65917,7 +65919,7 @@ export namespace Prisma {
   }
 
   export type usuariosCreateWithoutLogs_auditoriaInput = {
-    id: string
+    id?: string
     email: string
     password: string
     createdAt?: Date | string
@@ -65940,7 +65942,7 @@ export namespace Prisma {
   }
 
   export type usuariosUncheckedCreateWithoutLogs_auditoriaInput = {
-    id: string
+    id?: string
     email: string
     password: string
     sucursalId?: string | null
@@ -66025,7 +66027,7 @@ export namespace Prisma {
   }
 
   export type usuariosCreateWithoutRespaldosInput = {
-    id: string
+    id?: string
     email: string
     password: string
     createdAt?: Date | string
@@ -66048,7 +66050,7 @@ export namespace Prisma {
   }
 
   export type usuariosUncheckedCreateWithoutRespaldosInput = {
-    id: string
+    id?: string
     email: string
     password: string
     sucursalId?: string | null
@@ -66320,7 +66322,7 @@ export namespace Prisma {
   }
 
   export type usuariosCreateWithoutRestauracionesInput = {
-    id: string
+    id?: string
     email: string
     password: string
     createdAt?: Date | string
@@ -66343,7 +66345,7 @@ export namespace Prisma {
   }
 
   export type usuariosUncheckedCreateWithoutRestauracionesInput = {
-    id: string
+    id?: string
     email: string
     password: string
     sucursalId?: string | null
@@ -66576,7 +66578,7 @@ export namespace Prisma {
   }
 
   export type usuariosCreateWithoutAuditoria_respaldosInput = {
-    id: string
+    id?: string
     email: string
     password: string
     createdAt?: Date | string
@@ -66599,7 +66601,7 @@ export namespace Prisma {
   }
 
   export type usuariosUncheckedCreateWithoutAuditoria_respaldosInput = {
-    id: string
+    id?: string
     email: string
     password: string
     sucursalId?: string | null
@@ -68403,7 +68405,7 @@ export namespace Prisma {
   }
 
   export type usuariosCreateManySucursalesInput = {
-    id: string
+    id?: string
     email: string
     password: string
     createdAt?: Date | string

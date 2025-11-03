@@ -110,7 +110,7 @@ export async function createUsuario(data) {
     }
 
     // Validar jerarquía de roles
-    if (session.user.role === "ADMIN_SUCURSAL") {
+    if (session.role === "ADMIN_SUCURSAL") {
       // ADMIN_SUCURSAL solo puede crear OPERADOR y CONDUCTOR
       if (!["OPERADOR", "CONDUCTOR"].includes(role)) {
         return {
@@ -120,7 +120,7 @@ export async function createUsuario(data) {
       }
 
       // ADMIN_SUCURSAL solo puede asignar usuarios a su sucursal
-      if (sucursalId && sucursalId !== session.user.sucursalId) {
+      if (sucursalId && sucursalId !== session.sucursalId) {
         return {
           success: false,
           error: "Solo puedes asignar usuarios a tu sucursal",
@@ -152,7 +152,7 @@ export async function createUsuario(data) {
         email: email.toLowerCase().trim(),
         password: hashedPassword,
         role,
-        telefono: telefono?.trim() || null,
+        phone: telefono?.trim() || null,
         sucursalId: sucursalId || null,
       },
       select: {
@@ -212,9 +212,9 @@ export async function updateUsuario(id, data) {
     }
 
     // Validar jerarquía de roles
-    if (session.user.role === "ADMIN_SUCURSAL") {
+    if (session.role === "ADMIN_SUCURSAL") {
       // ADMIN_SUCURSAL solo puede editar usuarios de su sucursal
-      if (existingUser.sucursalId !== session.user.sucursalId) {
+      if (existingUser.sucursalId !== session.sucursalId) {
         return {
           success: false,
           error: "Solo puedes editar usuarios de tu sucursal",
@@ -263,7 +263,7 @@ export async function updateUsuario(id, data) {
     if (name) updateData.name = name.trim();
     if (email) updateData.email = email.toLowerCase().trim();
     if (role) updateData.role = role;
-    if (telefono !== undefined) updateData.telefono = telefono?.trim() || null;
+    if (telefono !== undefined) updateData.phone = telefono?.trim() || null;
     if (sucursalId !== undefined) updateData.sucursalId = sucursalId || null;
 
     // Encriptar nueva contraseña si se proporciona
@@ -328,7 +328,7 @@ export async function deleteUsuario(id) {
     }
 
     // No permitir eliminar el propio usuario
-    if (existingUser.id === session.user.id) {
+    if (existingUser.id === session.id) {
       return {
         success: false,
         error: "No puedes eliminar tu propio usuario",
@@ -336,9 +336,9 @@ export async function deleteUsuario(id) {
     }
 
     // Validar jerarquía de roles
-    if (session.user.role === "ADMIN_SUCURSAL") {
+    if (session.role === "ADMIN_SUCURSAL") {
       // ADMIN_SUCURSAL solo puede eliminar usuarios de su sucursal
-      if (existingUser.sucursalId !== session.user.sucursalId) {
+      if (existingUser.sucursalId !== session.sucursalId) {
         return {
           success: false,
           error: "Solo puedes eliminar usuarios de tu sucursal",

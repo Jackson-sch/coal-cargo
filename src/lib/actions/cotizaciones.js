@@ -353,6 +353,7 @@ export async function getCotizacionById(id) {
       },
     });
 
+
     if (!cotizacion) {
       return {
         success: false,
@@ -695,7 +696,11 @@ export async function convertirCotizacionAEnvio(
     }
 
     // Generar número de guía único usando el sistema centralizado
-    const guia = await generarNumeroGuia(sucursalOrigenId);
+    const guia = await generarNumeroGuia(cotizacion.sucursalOrigenId);
+
+    // Generar ID único para el envío y evento
+    const timestamp = Date.now();
+    const random = Math.random().toString(36).substring(2, 11);
 
     // VERIFICAR que los campos no sean undefined
     const datosEnvio = {
@@ -814,9 +819,13 @@ export async function convertirCotizacionAEnvio(
       message: `Envío creado exitosamente con guía ${guia}`,
     };
   } catch (error) {
+    console.error("Error al convertir cotización a envío:", error);
     return {
       success: false,
-      error: "Error al convertir la cotización a envío",
+      error:
+        error.message ||
+        error.toString() ||
+        "Error al convertir la cotización a envío",
     };
   }
 }

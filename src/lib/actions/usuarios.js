@@ -35,15 +35,60 @@ function handleActionError(error) {
   };
 }
 
-// Obtener todos los usuarios
-export async function getUsuarios() {
+// Obtener todos los usuarios con filtros
+export async function getUsuarios(searchParams = {}) {
   try {
-    await checkPermissions(["SUPER_ADMIN", "ADMIN_SUCURSAL"]);
+    const session = await checkPermissions(["SUPER_ADMIN", "ADMIN_SUCURSAL"]);
+
+    const { estado, role, sucursalId, q } = searchParams || {};
+
+    const where = {};
+
+    // Manejar el filtro de estado correctamente con soft delete
+    if (estado !== undefined) {
+      if (estado === "all") {
+        // Mostrar todos los usuarios no eliminados
+        where.deletedAt = null;
+      } else if (estado === "active") {
+        where.deletedAt = null;
+      } else if (estado === "deleted") {
+        where.deletedAt = { not: null }; // Solo eliminados
+      }
+    } else {
+      // Por defecto, mostrar solo usuarios activos
+      where.deletedAt = null;
+    }
+
+    // Filtro por rol
+    if (role && role !== "TODOS") {
+      where.role = role;
+    }
+
+    // Filtro por sucursal
+    if (sucursalId && sucursalId !== "TODAS") {
+      where.sucursalId = sucursalId;
+    } else if (session.role === "ADMIN_SUCURSAL" && session.sucursalId) {
+      // ADMIN_SUCURSAL solo ve usuarios de su sucursal
+      where.sucursalId = session.sucursalId;
+    }
+
+    // Filtro de búsqueda
+    if (q) {
+      const searchConditions = [
+        { name: { contains: q, mode: "insensitive" } },
+        { email: { contains: q, mode: "insensitive" } },
+      ];
+
+      if (where.OR) {
+        where.AND = [{ OR: where.OR }, { OR: searchConditions }];
+        delete where.OR;
+      } else {
+        where.OR = searchConditions;
+      }
+    }
 
     const usuarios = await prisma.usuarios.findMany({
-      where: {
-        deletedAt: null,
-      },
+      where,
       select: {
         id: true,
         name: true,
@@ -53,6 +98,7 @@ export async function getUsuarios() {
         sucursalId: true,
         createdAt: true,
         updatedAt: true,
+        deletedAt: true,
         sucursales: {
           select: {
             id: true,
@@ -97,15 +143,47 @@ export async function createUsuario(data) {
       };
     }
 
-    // Verificar que el email no esté en uso
-    const existingUser = await prisma.usuarios.findUnique({
-      where: { email },
+    // Normalizar email
+    const normalizedEmail = email.toLowerCase().trim();
+
+    // Verificar que el email no esté en uso (usuario activo)
+    const existingUser = await prisma.usuarios.findFirst({
+      where: {
+        email: normalizedEmail,
+        deletedAt: null,
+      },
     });
 
     if (existingUser) {
       return {
         success: false,
-        error: "Ya existe un usuario con este email",
+        error: "Ya existe un usuario activo con este email",
+      };
+    }
+
+    // Verificar si existe un usuario eliminado con este email (para sugerir restauración)
+    const deletedUser = await prisma.usuarios.findFirst({
+      where: {
+        email: normalizedEmail,
+        deletedAt: { not: null },
+      },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        deletedAt: true,
+      },
+    });
+
+    if (deletedUser) {
+      const fechaEliminacion = deletedUser.deletedAt
+        ? new Date(deletedUser.deletedAt).toLocaleDateString("es-PE")
+        : "fecha desconocida";
+
+      return {
+        success: false,
+        error: `Ya existe un usuario eliminado con este email (${deletedUser.name}, eliminado el ${fechaEliminacion}). Puedes restaurarlo desde la sección de usuarios eliminados.`,
+        usuarioEliminadoId: deletedUser.id,
       };
     }
 
@@ -149,7 +227,7 @@ export async function createUsuario(data) {
     const usuario = await prisma.usuarios.create({
       data: {
         name: name.trim(),
-        email: email.toLowerCase().trim(),
+        email: normalizedEmail,
         password: hashedPassword,
         role,
         phone: telefono?.trim() || null,
@@ -232,14 +310,46 @@ export async function updateUsuario(id, data) {
 
     // Verificar email único si se está cambiando
     if (email && email !== existingUser.email) {
-      const emailExists = await prisma.usuarios.findUnique({
-        where: { email: email.toLowerCase().trim() },
+      const normalizedEmail = email.toLowerCase().trim();
+
+      const emailExists = await prisma.usuarios.findFirst({
+        where: {
+          email: normalizedEmail,
+          deletedAt: null,
+          NOT: { id },
+        },
       });
 
       if (emailExists) {
         return {
           success: false,
-          error: "Ya existe un usuario con este email",
+          error: "Ya existe otro usuario activo con este email",
+        };
+      }
+
+      // Verificar si existe un usuario eliminado con este email
+      const deletedUserWithEmail = await prisma.usuarios.findFirst({
+        where: {
+          email: normalizedEmail,
+          deletedAt: { not: null },
+          NOT: { id },
+        },
+        select: {
+          id: true,
+          name: true,
+          deletedAt: true,
+        },
+      });
+
+      if (deletedUserWithEmail) {
+        const fechaEliminacion = deletedUserWithEmail.deletedAt
+          ? new Date(deletedUserWithEmail.deletedAt).toLocaleDateString("es-PE")
+          : "fecha desconocida";
+
+        return {
+          success: false,
+          error: `Ya existe un usuario eliminado con este email (${deletedUserWithEmail.name}, eliminado el ${fechaEliminacion}). Puedes restaurarlo desde la sección de usuarios eliminados.`,
+          usuarioEliminadoId: deletedUserWithEmail.id,
         };
       }
     }
@@ -315,7 +425,7 @@ export async function deleteUsuario(id) {
   try {
     const session = await checkPermissions(["SUPER_ADMIN", "ADMIN_SUCURSAL"]);
 
-    // Verificar que el usuario existe
+    // Verificar que el usuario existe y no está ya eliminado
     const existingUser = await prisma.usuarios.findUnique({
       where: { id },
     });
@@ -324,6 +434,14 @@ export async function deleteUsuario(id) {
       return {
         success: false,
         error: "Usuario no encontrado",
+      };
+    }
+
+    // Si ya está eliminado, no hacer nada
+    if (existingUser.deletedAt) {
+      return {
+        success: false,
+        error: "El usuario ya está eliminado",
       };
     }
 
@@ -402,6 +520,74 @@ export async function getSucursales() {
     return {
       success: true,
       data: sucursales,
+    };
+  } catch (error) {
+    return handleActionError(error);
+  }
+}
+
+// Reactivar usuario eliminado
+export async function reactivateUsuario(id) {
+  try {
+    await checkPermissions(["SUPER_ADMIN", "ADMIN_SUCURSAL"]);
+
+    // Buscar el usuario sin importar si tiene deletedAt o no
+    const existingUser = await prisma.usuarios.findUnique({
+      where: { id },
+    });
+
+    if (!existingUser) {
+      return {
+        success: false,
+        error: "Usuario no encontrado",
+      };
+    }
+
+    // Si el usuario no está eliminado, no hacer nada
+    if (!existingUser.deletedAt) {
+      return {
+        success: false,
+        error: "El usuario no está eliminado",
+      };
+    }
+
+    // Reactivar: limpiar deletedAt
+    const updatedUser = await prisma.usuarios.update({
+      where: { id },
+      data: {
+        deletedAt: null, // Limpiar el soft delete
+      },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        phone: true,
+        sucursalId: true,
+        createdAt: true,
+        deletedAt: true,
+        sucursales: {
+          select: {
+            id: true,
+            nombre: true,
+            provincia: true,
+          },
+        },
+      },
+    });
+
+    // Log de auditoría
+    await AuditLogger.logUserAction("RESTAURAR_USUARIO", id, {
+      nombre: updatedUser.name,
+      email: updatedUser.email,
+    });
+
+    revalidatePath("/dashboard/configuracion/usuarios");
+
+    return {
+      success: true,
+      data: updatedUser,
+      message: "Usuario restaurado correctamente",
     };
   } catch (error) {
     return handleActionError(error);

@@ -2,16 +2,22 @@
 
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
+import { auth } from "@/lib/auth";
 import { calcularCotizacionSucursal } from "@/lib/actions/cotizacion-sucursales";
 import { validarDocumentoPeruano } from "../utils/documentos.js";
 import { randomInt } from "crypto";
 import { generarNumeroGuia as generarGuiaCentralizada } from "@/lib/utils/guia-generator";
+import { crearNotificacionAutomatica } from "@/lib/utils/crear-notificacion-automatica";
 
 /**
  * Obtener todos los envíos con filtros - Versión limpia usando solo campos modernos
  */
 export async function getEnvios(filtros = {}) {
   try {
+    // Obtener información del usuario autenticado
+    const session = await auth();
+    const user = session?.user;
+
     const {
       estado,
       estados,
@@ -22,6 +28,7 @@ export async function getEnvios(filtros = {}) {
       fechaHasta,
       numeroGuia,
       guia,
+      busqueda,
       page = 1,
       limit = 8,
     } = filtros;
@@ -31,6 +38,68 @@ export async function getEnvios(filtros = {}) {
       deletedAt: null,
     };
 
+    // Filtrar por sucursal según el rol del usuario
+    if (user && user.role !== "SUPER_ADMIN" && user.sucursalId) {
+      // Usuario de sucursal: solo puede ver envíos de su sucursal (origen o destino)
+      // Ignorar filtros manuales de sucursal que no coincidan con su sucursal
+      const filtroOrigenManual = 
+        sucursalOrigenId && sucursalOrigenId !== "all-branches" 
+          ? sucursalOrigenId 
+          : null;
+      const filtroDestinoManual = 
+        sucursalDestinoId && sucursalDestinoId !== "all-branches" 
+          ? sucursalDestinoId 
+          : null;
+
+      // Si especificó un origen diferente a su sucursal, no mostrar nada
+      if (filtroOrigenManual && filtroOrigenManual !== user.sucursalId) {
+        return {
+          success: true,
+          data: [],
+          pagination: {
+            page,
+            limit,
+            total: 0,
+            totalPages: 0,
+          },
+        };
+      }
+
+      // Si especificó un destino diferente a su sucursal, no mostrar nada
+      if (filtroDestinoManual && filtroDestinoManual !== user.sucursalId) {
+        return {
+          success: true,
+          data: [],
+          pagination: {
+            page,
+            limit,
+            total: 0,
+            totalPages: 0,
+          },
+        };
+      }
+
+      // Aplicar filtro automático: envíos desde o hacia su sucursal
+      // Usar AND con OR para evitar conflictos con otras condiciones
+      whereConditions.AND = [
+        {
+          OR: [
+            { sucursalOrigenId: user.sucursalId },
+            { sucursalDestinoId: user.sucursalId },
+          ],
+        },
+      ];
+    } else if (user && user.role === "SUPER_ADMIN") {
+      // SUPER_ADMIN: puede filtrar por cualquier sucursal
+      if (sucursalOrigenId && sucursalOrigenId !== "all-branches") {
+        whereConditions.sucursalOrigenId = sucursalOrigenId;
+      }
+
+      if (sucursalDestinoId && sucursalDestinoId !== "all-branches") {
+        whereConditions.sucursalDestinoId = sucursalDestinoId;
+      }
+    }
+
     // Manejo de estado único o múltiples estados
     if (estados && Array.isArray(estados) && estados.length > 0) {
       whereConditions.estado = { in: estados };
@@ -38,36 +107,139 @@ export async function getEnvios(filtros = {}) {
       whereConditions.estado = estado;
     }
 
-    if (sucursalOrigenId && sucursalOrigenId !== "all-branches") {
-      whereConditions.sucursalOrigenId = sucursalOrigenId;
+    // Búsqueda general (guía o cliente)
+    if (busqueda && busqueda.trim() !== "") {
+      const searchTerm = busqueda.trim();
+      
+      // Buscar clientes que coincidan con el término de búsqueda
+      const clientesCoincidentes = await prisma.clientes.findMany({
+        where: {
+          deletedAt: null,
+          OR: [
+            { nombre: { contains: searchTerm, mode: "insensitive" } },
+            { apellidos: { contains: searchTerm, mode: "insensitive" } },
+            { razonSocial: { contains: searchTerm, mode: "insensitive" } },
+            { numeroDocumento: { contains: searchTerm, mode: "insensitive" } },
+          ],
+        },
+        select: { id: true },
+      });
+
+      const clienteIds = clientesCoincidentes.map((c) => c.id);
+
+      // Construir condiciones de búsqueda
+      const searchConditions = [
+        { guia: { contains: searchTerm, mode: "insensitive" } },
+      ];
+
+      // Si encontramos clientes coincidentes, agregar filtro por clienteId
+      if (clienteIds.length > 0) {
+        searchConditions.push({ clienteId: { in: clienteIds } });
+      }
+
+      // Combinar búsqueda con otros filtros
+      // Si ya hay un AND (por filtro de sucursal), agregar la búsqueda al AND
+      if (whereConditions.AND) {
+        // Ya hay un AND con filtro de sucursal, agregar la búsqueda
+        whereConditions.AND.push({ OR: searchConditions });
+        
+        // Agregar otras condiciones al AND si existen
+        if (whereConditions.estado) {
+          const tieneEstado = whereConditions.AND.some(cond => cond.estado || (cond.estado && Array.isArray(cond.estado.in)));
+          if (!tieneEstado) {
+            whereConditions.AND.push({ estado: whereConditions.estado });
+          }
+          delete whereConditions.estado;
+        }
+        if (whereConditions.sucursalOrigenId) {
+          delete whereConditions.sucursalOrigenId;
+        }
+        if (whereConditions.sucursalDestinoId) {
+          delete whereConditions.sucursalDestinoId;
+        }
+      } else {
+        // No hay AND, construir condiciones normalmente
+        const condicionesBase = { ...whereConditions };
+        delete condicionesBase.OR;
+        delete condicionesBase.AND;
+
+        // Si hay otras condiciones además de deletedAt, usar AND
+        if (Object.keys(condicionesBase).length > 1 || 
+            (Object.keys(condicionesBase).length === 1 && !condicionesBase.deletedAt)) {
+          whereConditions.AND = [
+            condicionesBase,
+            { OR: searchConditions },
+          ];
+
+          // Limpiar condiciones que ya están en AND
+          delete whereConditions.estado;
+          delete whereConditions.sucursalOrigenId;
+          delete whereConditions.sucursalDestinoId;
+        } else {
+          // Solo búsqueda, sin otros filtros
+          whereConditions.OR = searchConditions;
+        }
+      }
+    } else {
+      // Si no hay búsqueda general, usar los filtros específicos
+      if (clienteId && clienteId !== "all-clients") {
+        whereConditions.clienteId = clienteId;
+      }
+
+      // Manejo de búsqueda por guía (numeroGuia o guia)
+      const searchGuia = numeroGuia || guia;
+      if (searchGuia) {
+        whereConditions.guia = {
+          contains: searchGuia,
+          mode: "insensitive",
+        };
+      }
     }
 
-    if (sucursalDestinoId && sucursalDestinoId !== "all-branches") {
-      whereConditions.sucursalDestinoId = sucursalDestinoId;
-    }
+    // Determinar si filtrar por fechaEntrega o fechaRegistro
+    const filtroPorFechaEntrega = filtros.filtroPorFechaEntrega === true;
+    const campoFecha = filtroPorFechaEntrega ? "fechaEntrega" : "fechaRegistro";
 
-    if (clienteId && clienteId !== "all-clients") {
-      whereConditions.clienteId = clienteId;
-    }
-
-    // Manejo de búsqueda por guía (numeroGuia o guia)
-    const searchGuia = numeroGuia || guia;
-    if (searchGuia) {
-      whereConditions.guia = {
-        contains: searchGuia,
-        mode: "insensitive",
-      };
-    }
-
+    // Aplicar filtros de rango de fecha
     if (fechaDesde || fechaHasta) {
-      whereConditions.fechaRegistro = {};
+      const fechaFilter = {};
+      
       if (fechaDesde) {
-        whereConditions.fechaRegistro.gte = new Date(fechaDesde);
+        fechaFilter.gte = new Date(fechaDesde);
       }
       if (fechaHasta) {
-        whereConditions.fechaRegistro.lte = new Date(
-          fechaHasta + "T23:59:59.999Z"
-        );
+        const fechaHastaFinal = new Date(fechaHasta);
+        fechaHastaFinal.setHours(23, 59, 59, 999);
+        fechaFilter.lte = fechaHastaFinal;
+      }
+
+      // Si ya hay un AND, agregar el filtro de fecha como una condición más
+      if (whereConditions.AND) {
+        // Buscar si ya hay una condición de fecha en el AND
+        const tieneFecha = whereConditions.AND.some(cond => cond[campoFecha]);
+        if (!tieneFecha) {
+          whereConditions.AND.push({ [campoFecha]: fechaFilter });
+        } else {
+          // Actualizar la condición de fecha existente
+          const fechaIndex = whereConditions.AND.findIndex(cond => cond[campoFecha]);
+          if (fechaIndex !== -1) {
+            whereConditions.AND[fechaIndex][campoFecha] = fechaFilter;
+          }
+        }
+      } else {
+        // No hay AND, agregar directamente
+        whereConditions[campoFecha] = fechaFilter;
+      }
+    } else if (filtroPorFechaEntrega) {
+      // Si no hay rango de fechas pero estamos filtrando por fechaEntrega, 
+      // asegurarnos de que tenga fechaEntrega (no nula)
+      if (whereConditions.AND) {
+        const tieneFechaEntrega = whereConditions.AND.some(cond => cond.fechaEntrega);
+        if (!tieneFechaEntrega) {
+          whereConditions.AND.push({ fechaEntrega: { not: null } });
+        }
+      } else {
+        whereConditions.fechaEntrega = { not: null };
       }
     }
 
@@ -259,6 +431,24 @@ export async function getEnvios(filtros = {}) {
       },
     };
   } catch (error) {
+    console.error("Error en getEnvios:", error);
+    // Si es un error de Prisma relacionado con consultas vacías, no es realmente un error
+    if (error.code === "P2025" || error.message?.includes("Record to update not found")) {
+      return {
+        success: true,
+        data: {
+          envios: [],
+          pagination: {
+            page: filtros.page || 1,
+            limit: filtros.limit || 8,
+            total: 0,
+            totalPages: 0,
+            hasNext: false,
+            hasPrev: false,
+          },
+        },
+      };
+    }
     return {
       success: false,
       error: "Error al obtener los envíos",
@@ -727,6 +917,17 @@ export async function createEnvio(data) {
         });
 
         resultado = res;
+        
+        // Crear notificación automática de registro de envío
+        await crearNotificacionAutomatica({
+          envioId: res.id,
+          tipo: "REGISTRO_ENVIO",
+          estado: "REGISTRADO",
+          descripcion: `Envío ${res.guia} registrado exitosamente`,
+        }).catch((error) => {
+          console.error("Error al crear notificación automática:", error);
+        });
+        
         break;
       } catch (error) {
         if (
@@ -821,7 +1022,9 @@ export async function actualizarEstadoEnvio(
     const estadosValidos = [
       "REGISTRADO",
       "EN_BODEGA",
+      "EN_AGENCIA_ORIGEN",
       "EN_TRANSITO",
+      "EN_AGENCIA_DESTINO",
       "EN_REPARTO",
       "ENTREGADO",
       "DEVUELTO",
@@ -840,7 +1043,9 @@ export async function actualizarEstadoEnvio(
       const progresoMap = {
         REGISTRADO: 10,
         EN_BODEGA: 25,
+        EN_AGENCIA_ORIGEN: 35,
         EN_TRANSITO: 60,
+        EN_AGENCIA_DESTINO: 70,
         EN_REPARTO: 90,
         ENTREGADO: 100,
         DEVUELTO: 100,
@@ -877,8 +1082,10 @@ export async function actualizarEstadoEnvio(
           comentario: descripcion || getDescripcionEstado(nuevoEstado),
           ubicacion:
             ubicacion ||
-            (nuevoEstado === "ENTREGADO"
+            (nuevoEstado === "ENTREGADO" || nuevoEstado === "EN_AGENCIA_DESTINO"
               ? envio.sucursalDestino.nombre
+              : nuevoEstado === "EN_AGENCIA_ORIGEN"
+              ? envio.sucursalOrigen.nombre
               : envio.sucursalOrigen.nombre),
           fotoUrl: fotoUrl || null,
           firmaUrl: firmaUrl || null,
@@ -886,6 +1093,19 @@ export async function actualizarEstadoEnvio(
       });
 
       return envioActualizado;
+    });
+
+    // Crear notificación automática de cambio de estado
+    await crearNotificacionAutomatica({
+      envioId,
+      tipo:
+        nuevoEstado === "ENTREGADO"
+          ? "ENTREGA_EXITOSA"
+          : "CAMBIO_ESTADO",
+      estado: nuevoEstado,
+      descripcion: descripcion || `Estado del envío actualizado a: ${nuevoEstado}`,
+    }).catch((error) => {
+      console.error("Error al crear notificación automática:", error);
     });
 
     revalidatePath("/dashboard/envios");
@@ -991,53 +1211,139 @@ export async function asignarEnvio(envioId, usuarioId) {
  */
 export async function getEstadisticasEnvios() {
   try {
-    const [totalEnvios, enviosPorEstado, enviosHoy, ingresosMes] =
+    // Obtener información del usuario autenticado
+    const session = await auth();
+    const user = session?.user;
+
+    // Construir condiciones base
+    const baseWhere = { deletedAt: null };
+
+    // Si el usuario no es SUPER_ADMIN, filtrar por su sucursal
+    // Usar estructura AND con OR para compatibilidad con aggregate y groupBy
+    if (user && user.role !== "SUPER_ADMIN" && user.sucursalId) {
+      baseWhere.AND = [
+        {
+          OR: [
+            { sucursalOrigenId: user.sucursalId },
+            { sucursalDestinoId: user.sucursalId },
+          ],
+        },
+      ];
+    }
+
+    // Calcular fechas
+    // Usar fecha en UTC para evitar problemas de zona horaria
+    const hoy = new Date();
+    const inicioHoy = new Date(Date.UTC(
+      hoy.getUTCFullYear(),
+      hoy.getUTCMonth(),
+      hoy.getUTCDate(),
+      0, 0, 0, 0
+    ));
+    const finHoy = new Date(Date.UTC(
+      hoy.getUTCFullYear(),
+      hoy.getUTCMonth(),
+      hoy.getUTCDate(),
+      23, 59, 59, 999
+    ));
+    
+    const inicioMes = new Date(Date.UTC(
+      hoy.getUTCFullYear(),
+      hoy.getUTCMonth(),
+      1,
+      0, 0, 0, 0
+    ));
+
+    // Helper para construir where con condiciones adicionales
+    const buildWhereWithConditions = (additionalConditions) => {
+      // Siempre incluir deletedAt: null y el filtro de sucursal si existe
+      const whereClause = {
+        deletedAt: null,
+      };
+
+      // Si hay filtro de sucursal, agregarlo con AND
+      if (baseWhere.AND) {
+        whereClause.AND = [
+          ...baseWhere.AND,
+          additionalConditions,
+        ];
+      } else {
+        // Si no hay filtro de sucursal, combinar normalmente
+        Object.assign(whereClause, additionalConditions);
+      }
+
+      return whereClause;
+    };
+
+    // Obtener todos los envíos filtrados
+    const [totalEnvios, enviosPorEstado, enviosHoy, enviosMes] =
       await Promise.all([
         // Total de envíos
         prisma.envios.count({
-          where: { deletedAt: null },
+          where: baseWhere,
         }),
         // Envíos por estado
         prisma.envios.groupBy({
           by: ["estado"],
-          where: { deletedAt: null },
+          where: baseWhere,
           _count: { estado: true },
         }),
-        // Envíos de hoy
-        prisma.envios.count({
-          where: {
-            deletedAt: null,
+        // Envíos de hoy (comparar solo la fecha, ignorando la hora)
+        prisma.envios.findMany({
+          where: buildWhereWithConditions({
             fechaRegistro: {
-              gte: new Date(new Date().setHours(0, 0, 0, 0)),
+              gte: inicioHoy,
+              lte: finHoy,
             },
-          },
+          }),
+          select: { id: true },
         }),
-        // Ingresos del mes
-        prisma.envios.aggregate({
-          where: {
-            deletedAt: null,
+        // Envíos del mes (para calcular ingresos manualmente)
+        prisma.envios.findMany({
+          where: buildWhereWithConditions({
             estado: { not: "ANULADO" },
             fechaRegistro: {
-              gte: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
+              gte: inicioMes,
             },
-          },
-          _sum: { total: true },
+          }),
+          select: { id: true, total: true },
         }),
       ]);
+
+    // Calcular ingresos del mes sumando manualmente
+    const ingresosMes = enviosMes.reduce((sum, envio) => sum + (Number(envio.total) || 0), 0);
+
+    // Calcular envíos en tránsito (incluye múltiples estados)
+    const estadosEnTransito = [
+      "EN_TRANSITO",
+      "EN_AGENCIA_ORIGEN",
+      "EN_AGENCIA_DESTINO",
+      "EN_REPARTO",
+      "EN_BODEGA", // También se considera en tránsito si está en bodega
+    ];
+    
+    const enviosEnTransito = enviosPorEstado
+      .filter((item) => estadosEnTransito.includes(item.estado))
+      .reduce((sum, item) => sum + item._count.estado, 0);
+
+    // Convertir enviosPorEstado a objeto
+    const enviosPorEstadoObj = enviosPorEstado.reduce((acc, item) => {
+      acc[item.estado] = item._count.estado;
+      return acc;
+    }, {});
 
     return {
       success: true,
       data: {
         totalEnvios,
-        enviosPorEstado: enviosPorEstado.reduce((acc, item) => {
-          acc[item.estado] = item._count.estado;
-          return acc;
-        }, {}),
-        enviosHoy,
-        ingresosMes: ingresosMes._sum.total || 0,
+        enviosPorEstado: enviosPorEstadoObj,
+        enviosHoy: enviosHoy.length,
+        enviosEnTransito, // Agregar contador de envíos en tránsito
+        ingresosMes,
       },
     };
   } catch (error) {
+    console.error("Error en getEstadisticasEnvios:", error);
     return {
       success: false,
       error: "Error al obtener estadísticas",
@@ -1081,7 +1387,9 @@ function getDescripcionEstado(estado) {
   const descripciones = {
     REGISTRADO: "Envío registrado, pendiente de confirmación",
     EN_BODEGA: "Envío confirmado y en bodega",
+    EN_AGENCIA_ORIGEN: "Envío en agencia de origen",
     EN_TRANSITO: "Envío en tránsito hacia destino",
+    EN_AGENCIA_DESTINO: "Envío en agencia de destino",
     EN_REPARTO: "Envío en reparto para entrega",
     ENTREGADO: "Envío entregado exitosamente",
     DEVUELTO: "Envío devuelto al remitente",

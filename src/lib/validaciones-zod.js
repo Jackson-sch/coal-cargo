@@ -62,9 +62,9 @@ const ClienteCreateSchema = z.object({
   nombre: z.string().min(2, "Nombre muy corto").max(100, "Nombre muy largo"),
   apellidos: z
     .string()
-    .min(2, "Apellidos muy cortos")
     .max(100, "Apellidos muy largos")
-    .optional(),
+    .optional()
+    .or(z.literal("")),
   razonSocial: z.string().max(200, "Razón social muy larga").optional(),
   email: z.string().email("Email inválido").optional(),
   telefono: z
@@ -271,16 +271,17 @@ const SucursalUpdateSchema = SucursalCreateSchema.partial();
 const VehiculoCreateSchema = z.object({
   placa: z
     .string()
-    .min(6, "Placa inválida")
-    .max(8, "Placa inválida")
-    .refine((val) => /^[A-Z0-9-]+$/.test(val), "Formato de placa inválido"),
-  marca: z.string().max(50).optional(),
-  modelo: z.string().max(50).optional(),
+    .length(6, "La placa debe tener exactamente 6 caracteres")
+    .refine((val) => /^[A-Z0-9]+$/.test(val), "Formato de placa inválido. Solo letras y números")
+    .transform((val) => val.toUpperCase().trim()),
+  marca: z.string().max(50).optional().nullable(),
+  modelo: z.string().max(50).optional().nullable(),
   año: z
     .number()
     .min(1990, "Año muy antiguo")
     .max(new Date().getFullYear() + 1, "Año inválido")
-    .optional(),
+    .optional()
+    .nullable(),
   pesoMaximo: z
     .number()
     .min(100, "Capacidad de peso muy baja")
@@ -288,45 +289,184 @@ const VehiculoCreateSchema = z.object({
   volumenMaximo: z
     .number()
     .min(1, "Volumen muy bajo")
-    .max(100, "Volumen muy alto")
+    .max(1000, "Volumen muy alto")
+    .optional()
+    .nullable(),
+  tipoVehiculo: z
+    .enum(["CAMION_PEQUENO", "CAMION_MEDIANO", "CAMION_GRANDE", "TRAILER", "FURGONETA", "MOTOCICLETA"])
+    .optional()
+    .nullable(),
+  estado: z
+    .enum(["DISPONIBLE", "EN_RUTA", "MANTENIMIENTO", "INACTIVO"])
+    .default("DISPONIBLE")
     .optional(),
-  sucursalId: z.string().cuid("ID de sucursal inválido"),
-  conductorId: z.string().cuid().optional(),
-  soat: z.string().datetime().optional(),
-  revision: z.string().datetime().optional(),
+  sucursalId: z
+    .string()
+    .min(1, "ID de sucursal inválido")
+    .optional()
+    .nullable()
+    .transform((val) => (val === "" || !val ? null : val)),
+  conductorId: z
+    .union([
+      z.string().cuid("ID de conductor inválido"),
+      z.null(),
+      z.undefined(),
+    ])
+    .optional()
+    .nullable()
+    .transform((val) => (val === "" || !val ? null : val)),
+  soat: z.string().datetime().optional().nullable().or(z.date().optional().nullable()),
+  revision: z.string().datetime().optional().nullable().or(z.date().optional().nullable()),
+  observaciones: z.string().max(500).optional().nullable(),
 });
 
-const VehiculoUpdateSchema = VehiculoCreateSchema.partial();
+const VehiculoUpdateSchema = VehiculoCreateSchema.partial().extend({
+  placa: z
+    .string()
+    .length(6, "La placa debe tener exactamente 6 caracteres")
+    .refine((val) => /^[A-Z0-9]+$/.test(val), "Formato de placa inválido. Solo letras y números")
+    .transform((val) => val.toUpperCase().trim())
+    .optional(),
+});
+
+const VehiculoSearchSchema = z.object({
+  q: z.string().optional(),
+  estado: z.enum(["DISPONIBLE", "EN_RUTA", "MANTENIMIENTO", "INACTIVO", "all"]).optional(),
+  sucursalId: z.string().optional(),
+  conductorId: z.string().optional(),
+  tipoVehiculo: z.enum(["CAMION_PEQUENO", "CAMION_MEDIANO", "CAMION_GRANDE", "TRAILER", "FURGONETA", "MOTOCICLETA"]).optional(),
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(1).max(100).default(10),
+});
 
 // ============ VALIDACIONES DE RUTA ============
-const RutaCreateSchema = z
-  .object({
-    codigo: z
-      .string()
-      .min(3, "Código muy corto")
-      .max(20, "Código muy largo")
-      .refine(
-        (val) => /^[A-Z0-9-]+$/.test(val),
-        "Solo letras, números y guiones"
-      ),
-    nombre: z.string().min(5, "Nombre muy corto").max(100, "Nombre muy largo"),
-    descripcion: z.string().max(500).optional(),
-    vehiculoId: z.string().cuid("ID de vehículo inválido"),
-    fechaSalida: z.string().datetime("Fecha de salida inválida"),
-    fechaRetorno: z.string().datetime("Fecha de retorno inválida").optional(),
-  })
-  .refine(
-    (data) => {
-      if (data.fechaRetorno) {
-        return new Date(data.fechaSalida) < new Date(data.fechaRetorno);
-      }
-      return true;
-    },
-    {
-      message: "Fecha de retorno debe ser posterior a fecha de salida",
-      path: ["fechaRetorno"],
+const RutaCreateSchema = z.object({
+  nombre: z.string().min(3, "Nombre muy corto").max(100, "Nombre muy largo"),
+  codigo: z
+    .string()
+    .min(2, "Código muy corto")
+    .max(20, "Código muy largo")
+    .refine(
+      (val) => /^[A-Z0-9-]+$/.test(val),
+      "Solo letras mayúsculas, números y guiones"
+    )
+    .transform((val) => val.toUpperCase().trim()),
+  descripcion: z.string().max(500).optional().nullable(),
+  tipo: z
+    .enum(["URBANA", "INTERURBANA", "INTERPROVINCIAL", "INTERDEPARTAMENTAL"])
+    .default("URBANA"),
+  estado: z
+    .enum(["PROGRAMADA", "EN_CURSO", "COMPLETADA", "CANCELADA"])
+    .default("PROGRAMADA")
+    .optional(),
+  activo: z.boolean().default(true),
+  sucursalOrigenId: z.string().min(1, "Sucursal origen es requerida"),
+  sucursalDestinoId: z.string().min(1, "Sucursal destino es requerida"),
+  distancia: z
+    .preprocess(
+      (val) => (val === "" || val === null || val === undefined ? null : val),
+      z.coerce.number().min(0).max(10000).nullable().optional()
+    ),
+  tiempoEstimado: z
+    .preprocess(
+      (val) => (val === "" || val === null || val === undefined ? null : val),
+      z.coerce.number().int().min(0).max(1440).nullable().optional()
+    ),
+  costoBase: z
+    .preprocess(
+      (val) => (val === "" || val === null || val === undefined ? 0 : val),
+      z.coerce.number().min(0).max(100000).default(0)
+    ),
+  costoPeajes: z
+    .preprocess(
+      (val) => (val === "" || val === null || val === undefined ? 0 : val),
+      z.coerce.number().min(0).max(50000).default(0)
+    ),
+  costoCombustible: z
+    .preprocess(
+      (val) => (val === "" || val === null || val === undefined ? 0 : val),
+      z.coerce.number().min(0).max(50000).default(0)
+    ),
+  tipoVehiculo: z
+    .enum([
+      "CAMION_PEQUENO",
+      "CAMION_MEDIANO",
+      "CAMION_GRANDE",
+      "TRAILER",
+      "FURGONETA",
+      "MOTOCICLETA",
+    ])
+    .optional()
+    .nullable(),
+  capacidadMaxima: z
+    .preprocess(
+      (val) => (val === "" || val === null || val === undefined ? null : val),
+      z.coerce.number().min(1).max(50000).nullable().optional()
+    ),
+  paradas: z
+    .array(
+      z.object({
+        nombre: z.string(),
+        orden: z.number().int().min(1),
+        direccion: z.string().optional(),
+      })
+    )
+    .optional()
+    .nullable(),
+  horarios: z.array(z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/)).optional().nullable(),
+  observaciones: z.string().max(500).optional().nullable(),
+}).refine(
+  (data) => data.sucursalOrigenId !== data.sucursalDestinoId,
+  {
+    message: "La sucursal origen y destino no pueden ser la misma",
+    path: ["sucursalDestinoId"],
+  }
+);
+
+const RutaUpdateSchema = RutaCreateSchema.partial().extend({
+  codigo: z
+    .string()
+    .min(2, "Código muy corto")
+    .max(20, "Código muy largo")
+    .refine(
+      (val) => /^[A-Z0-9-]+$/.test(val),
+      "Solo letras mayúsculas, números y guiones"
+    )
+    .transform((val) => val.toUpperCase().trim())
+    .optional(),
+}).refine(
+  (data) => {
+    if (data.sucursalOrigenId && data.sucursalDestinoId) {
+      return data.sucursalOrigenId !== data.sucursalDestinoId;
     }
-  );
+    return true;
+  },
+  {
+    message: "La sucursal origen y destino no pueden ser la misma",
+    path: ["sucursalDestinoId"],
+  }
+);
+
+const RutaSearchSchema = z.object({
+  q: z.string().optional(),
+  tipo: z
+    .enum([
+      "URBANA",
+      "INTERURBANA",
+      "INTERPROVINCIAL",
+      "INTERDEPARTAMENTAL",
+      "all",
+    ])
+    .optional(),
+  estado: z
+    .enum(["PROGRAMADA", "EN_CURSO", "COMPLETADA", "CANCELADA", "all"])
+    .optional(),
+  activo: z.enum(["activo", "inactivo", "all"]).optional(),
+  sucursalOrigenId: z.string().optional(),
+  sucursalDestinoId: z.string().optional(),
+  page: z.number().int().min(1).default(1),
+  limit: z.number().int().min(1).max(100).default(10),
+});
 
 // ============ VALIDACIONES DE TARIFA ============
 const TarifaZonaCreateSchema = z
@@ -474,12 +614,48 @@ const ClienteCreateSchemaCustom = ClienteCreateSchema.refine(
     message: "Número de documento inválido para el tipo seleccionado",
     path: ["numeroDocumento"],
   }
-).refine((data) => validarTelefonoPeruano(data.telefono), {
-  message: "Formato de teléfono peruano inválido",
-  path: ["telefono"],
-});
+)
+  .refine((data) => validarTelefonoPeruano(data.telefono), {
+    message: "Formato de teléfono peruano inválido",
+    path: ["telefono"],
+  })
+  .superRefine((data, ctx) => {
+    // Si es empresa, debe tener razón social
+    if (data.esEmpresa && !data.razonSocial?.trim()) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "La razón social es requerida para empresas",
+        path: ["razonSocial"],
+      });
+    }
+
+    // Si no es empresa, debe tener apellidos
+    if (!data.esEmpresa && !data.apellidos?.trim()) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Los apellidos son requeridos para personas naturales",
+        path: ["apellidos"],
+      });
+    }
+
+    // Si es empresa y tiene apellidos, estos no deben ser validados con min(2)
+    // Los apellidos del representante legal pueden estar vacíos para empresas
+    if (data.esEmpresa && data.apellidos !== undefined) {
+      // Permitir string vacío o validar si tiene contenido
+      if (data.apellidos && data.apellidos.trim().length > 0 && data.apellidos.trim().length < 2) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Los apellidos del representante legal deben tener al menos 2 caracteres si se proporcionan",
+          path: ["apellidos"],
+        });
+      }
+    }
+  });
 
 export {
+  VehiculoCreateSchema,
+  VehiculoUpdateSchema,
+  VehiculoSearchSchema,
   EstadoEnvioEnum,
   TipoDocumentoEnum,
   TipoServicioEnum,
@@ -497,9 +673,9 @@ export {
   SeguimientoPublicoSchema,
   SucursalCreateSchema,
   SucursalUpdateSchema,
-  VehiculoCreateSchema,
-  VehiculoUpdateSchema,
   RutaCreateSchema,
+  RutaUpdateSchema,
+  RutaSearchSchema,
   TarifaZonaCreateSchema,
   ComprobanteCreateSchema,
   ReporteEnviosSchema,

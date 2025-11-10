@@ -458,6 +458,8 @@ export async function consultarEstadoComprobante(comprobanteId) {
     const nuevoEstado =
       estadosSimulados[Math.floor(Math.random() * estadosSimulados.length)];
 
+    const estadoAnterior = comprobante.estado;
+
     await prisma.comprobantes_electronicos.update({
       where: { id: comprobanteId },
       data: {
@@ -465,6 +467,16 @@ export async function consultarEstadoComprobante(comprobanteId) {
         fecha_actualizacion: new Date(),
       },
     });
+
+    // Enviar email si el estado cambió a ACEPTADO
+    if (nuevoEstado === "ACEPTADO" && estadoAnterior !== "ACEPTADO") {
+      const { enviarEmailComprobanteEmitido } = await import(
+        "@/lib/utils/enviar-email-comprobante"
+      );
+      enviarEmailComprobanteEmitido(comprobanteId).catch((error) => {
+        console.error("Error al enviar email de comprobante aceptado:", error);
+      });
+    }
 
     return {
       success: true,
@@ -499,6 +511,14 @@ export async function reenviarComprobanteElectronico(comprobanteId) {
         estado: "PENDIENTE",
         fecha_actualizacion: new Date(),
       },
+    });
+
+    // Enviar email de reenvío
+    const { enviarEmailComprobanteReenviado } = await import(
+      "@/lib/utils/enviar-email-comprobante"
+    );
+    enviarEmailComprobanteReenviado(comprobanteId).catch((error) => {
+      console.error("Error al enviar email de comprobante reenviado:", error);
     });
 
     return {

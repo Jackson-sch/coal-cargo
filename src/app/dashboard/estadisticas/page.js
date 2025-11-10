@@ -1,58 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { DatePickerWithRange } from "@/components/ui/date-range-picker";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
-import {
-  ChartConfig,
-  ChartContainer,
-  ChartTooltip,
-  ChartTooltipContent,
-  ChartLegend,
-  ChartLegendContent,
-} from "@/components/ui/chart";
-import {
-  Bar,
-  BarChart,
-  CartesianGrid,
-  XAxis,
-  YAxis,
-  PieChart,
-  Pie,
-  Cell,
-  ResponsiveContainer,
-  LineChart,
-  Line,
-  Area,
-  AreaChart,
-} from "recharts";
-import {
-  TrendingUp,
-  TrendingDown,
-  Package,
-  DollarSign,
-  Users,
-  Truck,
-  Calendar,
-  BarChart3,
-  PieChart as PieChartIcon,
-  Activity,
-} from "lucide-react";
+import { useSession } from "next-auth/react";
+import { toast } from "sonner";
 import { formatSoles } from "@/lib/utils/formatters";
 import HeaderEstadisticas from "@/components/estadisticas/header";
 import SpinnerGeneral from "@/components/spinner-general";
@@ -64,14 +14,20 @@ import GraficoTendenciaIngresos from "@/components/estadisticas/grafico-tendenci
 import GraficoTendenciaIngresosCostos from "@/components/estadisticas/grafico-tendencia-ingresos-costos";
 import TopClientes from "@/components/estadisticas/top-clientes";
 import RutasPopulares from "@/components/estadisticas/rutas-populares";
+import { getSucursalesList } from "@/lib/actions/sucursales";
 
 export default function EstadisticasPage() {
-  const [loading, setLoading] = useState(false);
+  const { data: session } = useSession();
+  const [loading, setLoading] = useState(true);
   const [fechaRango, setFechaRango] = useState({
     from: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
     to: new Date(),
   });
   const [periodo, setPeriodo] = useState("mes");
+  const [sucursales, setSucursales] = useState([]);
+  const [sucursalId, setSucursalId] = useState("ALL");
+  const [filtroTipo, setFiltroTipo] = useState("ambos");
+  const [datePickerKey, setDatePickerKey] = useState(0); // Key para forzar re-render del DatePicker
   // Estado para estadísticas reales;
   const [estadisticas, setEstadisticas] = useState({
     resumen: {
@@ -89,14 +45,16 @@ export default function EstadisticasPage() {
   // Configuración de colores para los gráficos
   const chartConfig = {
     // Claves que coinciden con los valores reales de "estado" para que el ChartLegend muestre texto
-    ENTREGADO: { label: "Entregado", color: "#22c55e" },
-    EN_TRANSITO: { label: "En Tránsito", color: "#3b82f6" },
-    EN_REPARTO: { label: "En Reparto", color: "#3b82f6" },
-    EN_BODEGA: { label: "En bodega", color: "#6b7280" },
-    PENDIENTE: { label: "Pendiente", color: "#f59e0b" },
     REGISTRADO: { label: "Registrado", color: "#f59e0b" },
-    ANULADO: { label: "Anulado", color: "#ef4444" },
+    EN_BODEGA: { label: "En Bodega", color: "#6b7280" },
+    EN_AGENCIA_ORIGEN: { label: "En Agencia Origen", color: "#3b82f6" },
+    EN_TRANSITO: { label: "En Tránsito", color: "#3b82f6" },
+    EN_AGENCIA_DESTINO: { label: "En Agencia Destino", color: "#8b5cf6" },
+    EN_REPARTO: { label: "En Reparto", color: "#06b6d4" },
+    ENTREGADO: { label: "Entregado", color: "#22c55e" },
     DEVUELTO: { label: "Devuelto", color: "#ef4444" },
+    ANULADO: { label: "Anulado", color: "#ef4444" },
+    PENDIENTE: { label: "Pendiente", color: "#f59e0b" },
     ingresos: {
       label: "Ingresos",
       color: "#8b5cf6",
@@ -107,41 +65,60 @@ export default function EstadisticasPage() {
     },
   };
 
+  // Cargar sucursales si es SUPER_ADMIN
   useEffect(() => {
-    cargarEstadisticas();
-  }, [fechaRango, periodo]);
+    if (session?.user?.role === "SUPER_ADMIN") {
+      cargarSucursales();
+    }
+  }, [session]);
+
+  // Cargar estadísticas cuando cambien los filtros
+  useEffect(() => {
+    if (session) {
+      cargarEstadisticas();
+    }
+  }, [fechaRango, periodo, sucursalId, filtroTipo, session]);
+
+  const cargarSucursales = async () => {
+    try {
+      const res = await getSucursalesList();
+      if (res?.success) {
+        setSucursales(res.data || []);
+      }
+    } catch (error) {
+      console.error("Error al cargar sucursales:", error);
+    }
+  };
 
   const cargarEstadisticas = async () => {
     setLoading(true);
     try {
+      const selectedSucursalId =
+        session?.user?.role === "SUPER_ADMIN" &&
+        sucursalId &&
+        sucursalId !== "ALL"
+          ? sucursalId
+          : undefined;
+
+      const tipoFiltro = selectedSucursalId ? filtroTipo : "ambos";
+
       const params = new URLSearchParams({
         periodo,
         ...(fechaRango?.from
           ? { fechaDesde: fechaRango.from.toISOString() }
           : {}),
         ...(fechaRango?.to ? { fechaHasta: fechaRango.to.toISOString() } : {}),
+        ...(selectedSucursalId ? { sucursalId: selectedSucursalId } : {}),
+        ...(tipoFiltro ? { filtroTipo: tipoFiltro } : {}),
       });
+
       const res = await fetch(`/api/estadisticas?${params.toString()}`);
       const result = await res.json();
+
       if (result?.success) {
         const estadoColor = (estado) => {
-          switch (estado) {
-            case "ENTREGADO":
-              return "#22c55e";
-            case "EN_TRANSITO":
-            case "EN_REPARTO":
-              return "#3b82f6";
-            case "EN_BODEGA":
-              return "#6b7280";
-            case "PENDIENTE":
-            case "REGISTRADO":
-              return "#f59e0b";
-            case "ANULADO":
-            case "DEVUELTO":
-              return "#ef4444";
-            default:
-              return "#6b7280";
-          }
+          // Usar el chartConfig para obtener el color, o un valor por defecto
+          return chartConfig[estado]?.color || "#6b7280";
         };
         setEstadisticas({
           ...result.data,
@@ -150,35 +127,43 @@ export default function EstadisticasPage() {
             color: estadoColor(e.estado),
           })),
         });
+      } else {
+        toast.error(result?.error || "Error al cargar estadísticas");
       }
     } catch (error) {
+      console.error("Error al cargar estadísticas:", error);
+      toast.error("Error al cargar estadísticas");
     } finally {
       setLoading(false);
     }
   };
 
-  // Función para aplicar filtros;
-  const aplicarFiltros = () => {
-    setLoading(true);
-
-    // Simular llamada a API con filtros;
-    setTimeout(() => {
-      // Aquí normalmente harías una llamada a la API con los filtros aplicados// Por ahora mantenemos los datos mock;
-      setLoading(false);
-    }, 1000);
-  };
-
-  // Función para limpiar filtros;
+  // Función para limpiar filtros
   const limpiarFiltros = () => {
-    setFechaRango({ from: null, to: null });
-    setPeriodo("mes");
-    aplicarFiltros();
-  };
+    // Resetear el rango de fechas al mes actual
+    const fechaInicioMes = new Date(
+      new Date().getFullYear(),
+      new Date().getMonth(),
+      1
+    );
+    const fechaFin = new Date();
+    fechaInicioMes.setHours(0, 0, 0, 0);
+    fechaFin.setHours(23, 59, 59, 999);
 
-  // Aplicar filtros cuando cambien;
-  useEffect(() => {
-    aplicarFiltros();
-  }, [fechaRango, periodo]);
+    // Actualizar el estado del rango de fechas
+    setFechaRango({
+      from: fechaInicioMes,
+      to: fechaFin,
+    });
+
+    // Resetear otros filtros
+    setPeriodo("mes");
+    setSucursalId("ALL");
+    setFiltroTipo("ambos");
+
+    // Forzar re-render del DatePicker cambiando su key
+    setDatePickerKey((prev) => prev + 1);
+  };
 
   if (loading) {
     return <SpinnerGeneral text="Cargando estadísticas generales..." />;
@@ -192,9 +177,15 @@ export default function EstadisticasPage() {
         setPeriodo={setPeriodo}
         fechaRango={fechaRango}
         setFechaRango={setFechaRango}
-        aplicarFiltros={aplicarFiltros}
         limpiarFiltros={limpiarFiltros}
         loading={loading}
+        session={session}
+        sucursales={sucursales}
+        sucursalId={sucursalId}
+        setSucursalId={setSucursalId}
+        filtroTipo={filtroTipo}
+        setFiltroTipo={setFiltroTipo}
+        datePickerKey={datePickerKey}
       />
 
       {/* Tarjetas de Resumen */}

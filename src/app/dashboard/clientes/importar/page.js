@@ -57,29 +57,42 @@ export default function ImportarClientesPage() {
   const [importResults, setImportResults] = useState(null);
   const [showResultsDialog, setShowResultsDialog] = useState(false);
 
-  // Manejar drag and drop
+  // Manejar drag and drop - Deshabilitado
   const handleDrag = useCallback((e) => {
     e.preventDefault();
     e.stopPropagation();
+    // Funcionalidad deshabilitada - no hacer nada
+    /*
     if (e.type === "dragenter" || e.type === "dragover") {
       setDragActive(true);
     } else if (e.type === "dragleave") {
       setDragActive(false);
     }
+    */
   }, []);
 
   const handleDrop = useCallback((e) => {
     e.preventDefault();
     e.stopPropagation();
     setDragActive(false);
+    // Funcionalidad deshabilitada
+    toast.error("La importación de clientes está deshabilitada actualmente.");
+    /*
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
       handleFileSelect(e.dataTransfer.files[0]);
     }
+    */
   }, []);
 
   const handleFileSelect = (selectedFile) => {
     if (!selectedFile) return;
 
+    // Funcionalidad deshabilitada
+    toast.error("La importación de clientes está deshabilitada actualmente.");
+    return;
+
+    // Código original comentado - funcionalidad deshabilitada
+    /*
     // Validar tipo de archivo
     const allowedTypes = [
       "text/csv",
@@ -107,9 +120,16 @@ export default function ImportarClientesPage() {
 
     setFile(selectedFile);
     processFile(selectedFile);
+    */
   };
 
   const processFile = async (file) => {
+    // Funcionalidad deshabilitada
+    toast.error("La importación de clientes está deshabilitada actualmente.");
+    return;
+
+    // Código original comentado - funcionalidad deshabilitada
+    /*
     setLoading(true);
     setPreviewData([]);
     setValidationResults(null);
@@ -141,9 +161,16 @@ export default function ImportarClientesPage() {
     } finally {
       setLoading(false);
     }
+    */
   };
 
   const handleImport = async () => {
+    // Funcionalidad deshabilitada
+    toast.error("La importación de clientes está deshabilitada actualmente.");
+    return;
+
+    // Código original comentado - funcionalidad deshabilitada
+    /*
     if (!file || !validationResults) return;
 
     setImportStatus("processing");
@@ -175,6 +202,7 @@ export default function ImportarClientesPage() {
       setImportStatus("error");
       toast.error("Error durante la importación");
     }
+    */
   };
 
   const downloadTemplate = () => {
@@ -221,7 +249,7 @@ export default function ImportarClientesPage() {
   };
 
   return (
-    <div className="flex-1 space-y-4 p-4 md:p-8 pt-6">
+    <div className="flex-1 space-y-4">
       {/* Header */}
       <div className="flex items-center justify-between space-y-2">
         <div className="flex items-center space-x-2">
@@ -240,12 +268,25 @@ export default function ImportarClientesPage() {
           </div>
         </div>
         <div className="flex items-center space-x-2">
-          <Button variant="outline" onClick={downloadTemplate}>
+          <Button 
+            variant="outline" 
+            onClick={(e) => {
+              e.preventDefault();
+              toast.error("La importación de clientes está deshabilitada actualmente.");
+            }}
+            disabled
+            className="opacity-50 cursor-not-allowed"
+          >
             <Download className="mr-2 h-4 w-4" />
             Descargar Plantilla
           </Button>
           {file && (
-            <Button variant="outline" onClick={resetImport}>
+            <Button 
+              variant="outline" 
+              onClick={resetImport}
+              disabled
+              className="opacity-50 cursor-not-allowed"
+            >
               <RefreshCw className="mr-2 h-4 w-4" />
               Reiniciar
             </Button>
@@ -253,10 +294,27 @@ export default function ImportarClientesPage() {
         </div>
       </div>
 
-      {/* Instrucciones */}
-      <Alert>
+      {/* Alerta de funcionalidad deshabilitada - Prominente */}
+      <Alert variant="destructive" className="border-2 border-red-500/50">
+        <XCircle className="h-5 w-5" />
+        <AlertTitle className="text-lg font-semibold">
+          ⚠️ Importación de Clientes Deshabilitada
+        </AlertTitle>
+        <AlertDescription className="mt-2 text-base">
+          <p className="font-medium mb-2">
+            La funcionalidad de importación masiva de clientes está actualmente deshabilitada.
+          </p>
+          <p className="text-sm">
+            Para agregar clientes, por favor utiliza el botón{" "}
+            <strong>"+ Nuevo Cliente"</strong> en la página principal de clientes.
+          </p>
+        </AlertDescription>
+      </Alert>
+
+      {/* Instrucciones - Información */}
+      <Alert className="opacity-60">
         <FileSpreadsheet className="h-4 w-4" />
-        <AlertTitle>Instrucciones de Importación</AlertTitle>
+        <AlertTitle>Instrucciones de Importación (No disponible)</AlertTitle>
         <AlertDescription>
           <ul className="mt-2 space-y-1 text-sm">
             <li>• Formatos soportados: CSV, XLS, XLSX</li>
@@ -273,9 +331,9 @@ export default function ImportarClientesPage() {
         </AlertDescription>
       </Alert>
 
-      {/* Área de carga de archivos */}
+      {/* Área de carga de archivos - Deshabilitada */}
       {!file && (
-        <Card>
+        <Card className="opacity-60">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Upload className="h-5 w-5" />
@@ -287,34 +345,60 @@ export default function ImportarClientesPage() {
           </CardHeader>
           <CardContent>
             <div
-              className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
+              className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors bg-muted/50 cursor-not-allowed ${
                 dragActive
-                  ? "border-primary bg-primary/5"
-                  : "border-muted-foreground/25 hover:border-muted-foreground/50"
+                  ? "border-muted-foreground/25"
+                  : "border-muted-foreground/25"
               }`}
-              onDragEnter={handleDrag}
-              onDragLeave={handleDrag}
-              onDragOver={handleDrag}
-              onDrop={handleDrop}
+              onDragEnter={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                toast.error("La importación de clientes está deshabilitada actualmente.");
+              }}
+              onDragLeave={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+              }}
+              onDragOver={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+              }}
+              onDrop={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                toast.error("La importación de clientes está deshabilitada actualmente.");
+              }}
             >
-              <Upload className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
+              <Upload className="mx-auto h-12 w-12 text-muted-foreground mb-4 opacity-50" />
               <div className="space-y-2">
-                <p className="text-lg font-medium">
-                  {dragActive
-                    ? "Suelta el archivo aquí"
-                    : "Arrastra tu archivo aquí"}
+                <p className="text-lg font-medium text-muted-foreground">
+                  Funcionalidad deshabilitada
                 </p>
-                <p className="text-sm text-muted-foreground">o</p>
-                <Label htmlFor="file-upload">
-                  <Button variant="outline" className="cursor-pointer">
+                <p className="text-sm text-muted-foreground">
+                  La importación de clientes no está disponible actualmente
+                </p>
+                <Label htmlFor="file-upload" className="cursor-not-allowed">
+                  <Button 
+                    variant="outline" 
+                    className="cursor-not-allowed opacity-50"
+                    disabled
+                    onClick={(e) => {
+                      e.preventDefault();
+                      toast.error("La importación de clientes está deshabilitada actualmente.");
+                    }}
+                  >
                     Seleccionar Archivo
                   </Button>
                   <Input
                     id="file-upload"
                     type="file"
                     accept=".csv,.xlsx,.xls"
-                    onChange={(e) => handleFileSelect(e.target.files[0])}
+                    onChange={(e) => {
+                      e.preventDefault();
+                      toast.error("La importación de clientes está deshabilitada actualmente.");
+                    }}
                     className="hidden"
+                    disabled
                   />
                 </Label>
               </div>
@@ -486,35 +570,29 @@ export default function ImportarClientesPage() {
         </Card>
       )}
 
-      {/* Botón de importación */}
+      {/* Botón de importación - Deshabilitado */}
       {validationResults && validationResults.valid > 0 && (
-        <Card>
+        <Card className="opacity-60">
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="font-medium">¿Proceder con la importación?</p>
+                <p className="font-medium text-muted-foreground">¿Proceder con la importación?</p>
                 <p className="text-sm text-muted-foreground">
-                  Se importarán {validationResults.valid} registros válidos
-                  {validationResults.invalid > 0 &&
-                    ` (${validationResults.invalid} registros con errores serán omitidos)`}
+                  Funcionalidad deshabilitada - La importación no está disponible actualmente
                 </p>
               </div>
               <Button
-                onClick={handleImport}
-                disabled={importStatus === "processing"}
+                onClick={(e) => {
+                  e.preventDefault();
+                  toast.error("La importación de clientes está deshabilitada actualmente.");
+                }}
+                disabled={true}
                 size="lg"
+                variant="outline"
+                className="cursor-not-allowed opacity-50"
               >
-                {importStatus === "processing" ? (
-                  <>
-                    <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
-                    Importando...
-                  </>
-                ) : (
-                  <>
-                    <Upload className="mr-2 h-4 w-4" />
-                    Importar Clientes
-                  </>
-                )}
+                <XCircle className="mr-2 h-4 w-4" />
+                Importación Deshabilitada
               </Button>
             </div>
           </CardContent>

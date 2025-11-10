@@ -4151,6 +4151,7 @@ export namespace Prisma {
     tarifasDestino: number
     tarifasOrigen: number
     usuarios: number
+    vehiculos: number
     rutasOrigen: number
     rutasDestino: number
   }
@@ -4163,6 +4164,7 @@ export namespace Prisma {
     tarifasDestino?: boolean | SucursalesCountOutputTypeCountTarifasDestinoArgs
     tarifasOrigen?: boolean | SucursalesCountOutputTypeCountTarifasOrigenArgs
     usuarios?: boolean | SucursalesCountOutputTypeCountUsuariosArgs
+    vehiculos?: boolean | SucursalesCountOutputTypeCountVehiculosArgs
     rutasOrigen?: boolean | SucursalesCountOutputTypeCountRutasOrigenArgs
     rutasDestino?: boolean | SucursalesCountOutputTypeCountRutasDestinoArgs
   }
@@ -4225,6 +4227,13 @@ export namespace Prisma {
    */
   export type SucursalesCountOutputTypeCountUsuariosArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     where?: usuariosWhereInput
+  }
+
+  /**
+   * SucursalesCountOutputType without action
+   */
+  export type SucursalesCountOutputTypeCountVehiculosArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: vehiculosWhereInput
   }
 
   /**
@@ -14182,6 +14191,7 @@ export namespace Prisma {
     tarifasDestino?: boolean | sucursales$tarifasDestinoArgs<ExtArgs>
     tarifasOrigen?: boolean | sucursales$tarifasOrigenArgs<ExtArgs>
     usuarios?: boolean | sucursales$usuariosArgs<ExtArgs>
+    vehiculos?: boolean | sucursales$vehiculosArgs<ExtArgs>
     rutasOrigen?: boolean | sucursales$rutasOrigenArgs<ExtArgs>
     rutasDestino?: boolean | sucursales$rutasDestinoArgs<ExtArgs>
     _count?: boolean | SucursalesCountOutputTypeDefaultArgs<ExtArgs>
@@ -14229,6 +14239,7 @@ export namespace Prisma {
     tarifasDestino?: boolean | sucursales$tarifasDestinoArgs<ExtArgs>
     tarifasOrigen?: boolean | sucursales$tarifasOrigenArgs<ExtArgs>
     usuarios?: boolean | sucursales$usuariosArgs<ExtArgs>
+    vehiculos?: boolean | sucursales$vehiculosArgs<ExtArgs>
     rutasOrigen?: boolean | sucursales$rutasOrigenArgs<ExtArgs>
     rutasDestino?: boolean | sucursales$rutasDestinoArgs<ExtArgs>
     _count?: boolean | SucursalesCountOutputTypeDefaultArgs<ExtArgs>
@@ -14246,6 +14257,7 @@ export namespace Prisma {
       tarifasDestino: Prisma.$tarifas_sucursalesPayload<ExtArgs>[]
       tarifasOrigen: Prisma.$tarifas_sucursalesPayload<ExtArgs>[]
       usuarios: Prisma.$usuariosPayload<ExtArgs>[]
+      vehiculos: Prisma.$vehiculosPayload<ExtArgs>[]
       rutasOrigen: Prisma.$rutasPayload<ExtArgs>[]
       rutasDestino: Prisma.$rutasPayload<ExtArgs>[]
     }
@@ -14659,6 +14671,7 @@ export namespace Prisma {
     tarifasDestino<T extends sucursales$tarifasDestinoArgs<ExtArgs> = {}>(args?: Subset<T, sucursales$tarifasDestinoArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$tarifas_sucursalesPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     tarifasOrigen<T extends sucursales$tarifasOrigenArgs<ExtArgs> = {}>(args?: Subset<T, sucursales$tarifasOrigenArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$tarifas_sucursalesPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     usuarios<T extends sucursales$usuariosArgs<ExtArgs> = {}>(args?: Subset<T, sucursales$usuariosArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$usuariosPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+    vehiculos<T extends sucursales$vehiculosArgs<ExtArgs> = {}>(args?: Subset<T, sucursales$vehiculosArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$vehiculosPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     rutasOrigen<T extends sucursales$rutasOrigenArgs<ExtArgs> = {}>(args?: Subset<T, sucursales$rutasOrigenArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$rutasPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     rutasDestino<T extends sucursales$rutasDestinoArgs<ExtArgs> = {}>(args?: Subset<T, sucursales$rutasDestinoArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$rutasPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     /**
@@ -15251,6 +15264,30 @@ export namespace Prisma {
     take?: number
     skip?: number
     distinct?: UsuariosScalarFieldEnum | UsuariosScalarFieldEnum[]
+  }
+
+  /**
+   * sucursales.vehiculos
+   */
+  export type sucursales$vehiculosArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the vehiculos
+     */
+    select?: vehiculosSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the vehiculos
+     */
+    omit?: vehiculosOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: vehiculosInclude<ExtArgs> | null
+    where?: vehiculosWhereInput
+    orderBy?: vehiculosOrderByWithRelationInput | vehiculosOrderByWithRelationInput[]
+    cursor?: vehiculosWhereUniqueInput
+    take?: number
+    skip?: number
+    distinct?: VehiculosScalarFieldEnum | VehiculosScalarFieldEnum[]
   }
 
   /**
@@ -19207,19 +19244,35 @@ export namespace Prisma {
   }
 
   export type VehiculosAvgAggregateOutputType = {
+    año: number | null
     capacidad: number | null
+    pesoMaximo: number | null
+    volumenMaximo: number | null
   }
 
   export type VehiculosSumAggregateOutputType = {
+    año: number | null
     capacidad: number | null
+    pesoMaximo: number | null
+    volumenMaximo: number | null
   }
 
   export type VehiculosMinAggregateOutputType = {
     id: string | null
     placa: string | null
+    marca: string | null
     modelo: string | null
+    año: number | null
     capacidad: number | null
+    pesoMaximo: number | null
+    volumenMaximo: number | null
+    tipoVehiculo: $Enums.TipoVehiculo | null
+    estado: $Enums.EstadoVehiculo | null
+    sucursalId: string | null
     conductorId: string | null
+    soat: Date | null
+    revision: Date | null
+    observaciones: string | null
     createdAt: Date | null
     updatedAt: Date | null
     deletedAt: Date | null
@@ -19228,9 +19281,19 @@ export namespace Prisma {
   export type VehiculosMaxAggregateOutputType = {
     id: string | null
     placa: string | null
+    marca: string | null
     modelo: string | null
+    año: number | null
     capacidad: number | null
+    pesoMaximo: number | null
+    volumenMaximo: number | null
+    tipoVehiculo: $Enums.TipoVehiculo | null
+    estado: $Enums.EstadoVehiculo | null
+    sucursalId: string | null
     conductorId: string | null
+    soat: Date | null
+    revision: Date | null
+    observaciones: string | null
     createdAt: Date | null
     updatedAt: Date | null
     deletedAt: Date | null
@@ -19239,9 +19302,19 @@ export namespace Prisma {
   export type VehiculosCountAggregateOutputType = {
     id: number
     placa: number
+    marca: number
     modelo: number
+    año: number
     capacidad: number
+    pesoMaximo: number
+    volumenMaximo: number
+    tipoVehiculo: number
+    estado: number
+    sucursalId: number
     conductorId: number
+    soat: number
+    revision: number
+    observaciones: number
     createdAt: number
     updatedAt: number
     deletedAt: number
@@ -19250,19 +19323,35 @@ export namespace Prisma {
 
 
   export type VehiculosAvgAggregateInputType = {
+    año?: true
     capacidad?: true
+    pesoMaximo?: true
+    volumenMaximo?: true
   }
 
   export type VehiculosSumAggregateInputType = {
+    año?: true
     capacidad?: true
+    pesoMaximo?: true
+    volumenMaximo?: true
   }
 
   export type VehiculosMinAggregateInputType = {
     id?: true
     placa?: true
+    marca?: true
     modelo?: true
+    año?: true
     capacidad?: true
+    pesoMaximo?: true
+    volumenMaximo?: true
+    tipoVehiculo?: true
+    estado?: true
+    sucursalId?: true
     conductorId?: true
+    soat?: true
+    revision?: true
+    observaciones?: true
     createdAt?: true
     updatedAt?: true
     deletedAt?: true
@@ -19271,9 +19360,19 @@ export namespace Prisma {
   export type VehiculosMaxAggregateInputType = {
     id?: true
     placa?: true
+    marca?: true
     modelo?: true
+    año?: true
     capacidad?: true
+    pesoMaximo?: true
+    volumenMaximo?: true
+    tipoVehiculo?: true
+    estado?: true
+    sucursalId?: true
     conductorId?: true
+    soat?: true
+    revision?: true
+    observaciones?: true
     createdAt?: true
     updatedAt?: true
     deletedAt?: true
@@ -19282,9 +19381,19 @@ export namespace Prisma {
   export type VehiculosCountAggregateInputType = {
     id?: true
     placa?: true
+    marca?: true
     modelo?: true
+    año?: true
     capacidad?: true
+    pesoMaximo?: true
+    volumenMaximo?: true
+    tipoVehiculo?: true
+    estado?: true
+    sucursalId?: true
     conductorId?: true
+    soat?: true
+    revision?: true
+    observaciones?: true
     createdAt?: true
     updatedAt?: true
     deletedAt?: true
@@ -19380,9 +19489,19 @@ export namespace Prisma {
   export type VehiculosGroupByOutputType = {
     id: string
     placa: string
+    marca: string | null
     modelo: string | null
+    año: number | null
     capacidad: number | null
+    pesoMaximo: number
+    volumenMaximo: number | null
+    tipoVehiculo: $Enums.TipoVehiculo | null
+    estado: $Enums.EstadoVehiculo
+    sucursalId: string | null
     conductorId: string | null
+    soat: Date | null
+    revision: Date | null
+    observaciones: string | null
     createdAt: Date
     updatedAt: Date
     deletedAt: Date | null
@@ -19410,63 +19529,109 @@ export namespace Prisma {
   export type vehiculosSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
     id?: boolean
     placa?: boolean
+    marca?: boolean
     modelo?: boolean
+    año?: boolean
     capacidad?: boolean
+    pesoMaximo?: boolean
+    volumenMaximo?: boolean
+    tipoVehiculo?: boolean
+    estado?: boolean
+    sucursalId?: boolean
     conductorId?: boolean
+    soat?: boolean
+    revision?: boolean
+    observaciones?: boolean
     createdAt?: boolean
     updatedAt?: boolean
     deletedAt?: boolean
     envios?: boolean | vehiculos$enviosArgs<ExtArgs>
     usuarios?: boolean | vehiculos$usuariosArgs<ExtArgs>
+    sucursal?: boolean | vehiculos$sucursalArgs<ExtArgs>
     _count?: boolean | VehiculosCountOutputTypeDefaultArgs<ExtArgs>
   }, ExtArgs["result"]["vehiculos"]>
 
   export type vehiculosSelectCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
     id?: boolean
     placa?: boolean
+    marca?: boolean
     modelo?: boolean
+    año?: boolean
     capacidad?: boolean
+    pesoMaximo?: boolean
+    volumenMaximo?: boolean
+    tipoVehiculo?: boolean
+    estado?: boolean
+    sucursalId?: boolean
     conductorId?: boolean
+    soat?: boolean
+    revision?: boolean
+    observaciones?: boolean
     createdAt?: boolean
     updatedAt?: boolean
     deletedAt?: boolean
     usuarios?: boolean | vehiculos$usuariosArgs<ExtArgs>
+    sucursal?: boolean | vehiculos$sucursalArgs<ExtArgs>
   }, ExtArgs["result"]["vehiculos"]>
 
   export type vehiculosSelectUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
     id?: boolean
     placa?: boolean
+    marca?: boolean
     modelo?: boolean
+    año?: boolean
     capacidad?: boolean
+    pesoMaximo?: boolean
+    volumenMaximo?: boolean
+    tipoVehiculo?: boolean
+    estado?: boolean
+    sucursalId?: boolean
     conductorId?: boolean
+    soat?: boolean
+    revision?: boolean
+    observaciones?: boolean
     createdAt?: boolean
     updatedAt?: boolean
     deletedAt?: boolean
     usuarios?: boolean | vehiculos$usuariosArgs<ExtArgs>
+    sucursal?: boolean | vehiculos$sucursalArgs<ExtArgs>
   }, ExtArgs["result"]["vehiculos"]>
 
   export type vehiculosSelectScalar = {
     id?: boolean
     placa?: boolean
+    marca?: boolean
     modelo?: boolean
+    año?: boolean
     capacidad?: boolean
+    pesoMaximo?: boolean
+    volumenMaximo?: boolean
+    tipoVehiculo?: boolean
+    estado?: boolean
+    sucursalId?: boolean
     conductorId?: boolean
+    soat?: boolean
+    revision?: boolean
+    observaciones?: boolean
     createdAt?: boolean
     updatedAt?: boolean
     deletedAt?: boolean
   }
 
-  export type vehiculosOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "placa" | "modelo" | "capacidad" | "conductorId" | "createdAt" | "updatedAt" | "deletedAt", ExtArgs["result"]["vehiculos"]>
+  export type vehiculosOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "placa" | "marca" | "modelo" | "año" | "capacidad" | "pesoMaximo" | "volumenMaximo" | "tipoVehiculo" | "estado" | "sucursalId" | "conductorId" | "soat" | "revision" | "observaciones" | "createdAt" | "updatedAt" | "deletedAt", ExtArgs["result"]["vehiculos"]>
   export type vehiculosInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     envios?: boolean | vehiculos$enviosArgs<ExtArgs>
     usuarios?: boolean | vehiculos$usuariosArgs<ExtArgs>
+    sucursal?: boolean | vehiculos$sucursalArgs<ExtArgs>
     _count?: boolean | VehiculosCountOutputTypeDefaultArgs<ExtArgs>
   }
   export type vehiculosIncludeCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     usuarios?: boolean | vehiculos$usuariosArgs<ExtArgs>
+    sucursal?: boolean | vehiculos$sucursalArgs<ExtArgs>
   }
   export type vehiculosIncludeUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     usuarios?: boolean | vehiculos$usuariosArgs<ExtArgs>
+    sucursal?: boolean | vehiculos$sucursalArgs<ExtArgs>
   }
 
   export type $vehiculosPayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
@@ -19474,13 +19639,24 @@ export namespace Prisma {
     objects: {
       envios: Prisma.$enviosPayload<ExtArgs>[]
       usuarios: Prisma.$usuariosPayload<ExtArgs> | null
+      sucursal: Prisma.$sucursalesPayload<ExtArgs> | null
     }
     scalars: $Extensions.GetPayloadResult<{
       id: string
       placa: string
+      marca: string | null
       modelo: string | null
+      año: number | null
       capacidad: number | null
+      pesoMaximo: number
+      volumenMaximo: number | null
+      tipoVehiculo: $Enums.TipoVehiculo | null
+      estado: $Enums.EstadoVehiculo
+      sucursalId: string | null
       conductorId: string | null
+      soat: Date | null
+      revision: Date | null
+      observaciones: string | null
       createdAt: Date
       updatedAt: Date
       deletedAt: Date | null
@@ -19880,6 +20056,7 @@ export namespace Prisma {
     readonly [Symbol.toStringTag]: "PrismaPromise"
     envios<T extends vehiculos$enviosArgs<ExtArgs> = {}>(args?: Subset<T, vehiculos$enviosArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$enviosPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     usuarios<T extends vehiculos$usuariosArgs<ExtArgs> = {}>(args?: Subset<T, vehiculos$usuariosArgs<ExtArgs>>): Prisma__usuariosClient<$Result.GetResult<Prisma.$usuariosPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+    sucursal<T extends vehiculos$sucursalArgs<ExtArgs> = {}>(args?: Subset<T, vehiculos$sucursalArgs<ExtArgs>>): Prisma__sucursalesClient<$Result.GetResult<Prisma.$sucursalesPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
     /**
      * Attaches callbacks for the resolution and/or rejection of the Promise.
      * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -19911,9 +20088,19 @@ export namespace Prisma {
   interface vehiculosFieldRefs {
     readonly id: FieldRef<"vehiculos", 'String'>
     readonly placa: FieldRef<"vehiculos", 'String'>
+    readonly marca: FieldRef<"vehiculos", 'String'>
     readonly modelo: FieldRef<"vehiculos", 'String'>
+    readonly año: FieldRef<"vehiculos", 'Int'>
     readonly capacidad: FieldRef<"vehiculos", 'Float'>
+    readonly pesoMaximo: FieldRef<"vehiculos", 'Float'>
+    readonly volumenMaximo: FieldRef<"vehiculos", 'Float'>
+    readonly tipoVehiculo: FieldRef<"vehiculos", 'TipoVehiculo'>
+    readonly estado: FieldRef<"vehiculos", 'EstadoVehiculo'>
+    readonly sucursalId: FieldRef<"vehiculos", 'String'>
     readonly conductorId: FieldRef<"vehiculos", 'String'>
+    readonly soat: FieldRef<"vehiculos", 'DateTime'>
+    readonly revision: FieldRef<"vehiculos", 'DateTime'>
+    readonly observaciones: FieldRef<"vehiculos", 'String'>
     readonly createdAt: FieldRef<"vehiculos", 'DateTime'>
     readonly updatedAt: FieldRef<"vehiculos", 'DateTime'>
     readonly deletedAt: FieldRef<"vehiculos", 'DateTime'>
@@ -20353,6 +20540,25 @@ export namespace Prisma {
      */
     include?: usuariosInclude<ExtArgs> | null
     where?: usuariosWhereInput
+  }
+
+  /**
+   * vehiculos.sucursal
+   */
+  export type vehiculos$sucursalArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the sucursales
+     */
+    select?: sucursalesSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the sucursales
+     */
+    omit?: sucursalesOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: sucursalesInclude<ExtArgs> | null
+    where?: sucursalesWhereInput
   }
 
   /**
@@ -43883,9 +44089,19 @@ export namespace Prisma {
   export const VehiculosScalarFieldEnum: {
     id: 'id',
     placa: 'placa',
+    marca: 'marca',
     modelo: 'modelo',
+    año: 'año',
     capacidad: 'capacidad',
+    pesoMaximo: 'pesoMaximo',
+    volumenMaximo: 'volumenMaximo',
+    tipoVehiculo: 'tipoVehiculo',
+    estado: 'estado',
+    sucursalId: 'sucursalId',
     conductorId: 'conductorId',
+    soat: 'soat',
+    revision: 'revision',
+    observaciones: 'observaciones',
     createdAt: 'createdAt',
     updatedAt: 'updatedAt',
     deletedAt: 'deletedAt'
@@ -44516,6 +44732,34 @@ export namespace Prisma {
 
 
   /**
+   * Reference to a field of type 'TipoVehiculo'
+   */
+  export type EnumTipoVehiculoFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'TipoVehiculo'>
+    
+
+
+  /**
+   * Reference to a field of type 'TipoVehiculo[]'
+   */
+  export type ListEnumTipoVehiculoFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'TipoVehiculo[]'>
+    
+
+
+  /**
+   * Reference to a field of type 'EstadoVehiculo'
+   */
+  export type EnumEstadoVehiculoFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'EstadoVehiculo'>
+    
+
+
+  /**
+   * Reference to a field of type 'EstadoVehiculo[]'
+   */
+  export type ListEnumEstadoVehiculoFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'EstadoVehiculo[]'>
+    
+
+
+  /**
    * Reference to a field of type 'EstadoCotizacion'
    */
   export type EnumEstadoCotizacionFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'EstadoCotizacion'>
@@ -44582,20 +44826,6 @@ export namespace Prisma {
    * Reference to a field of type 'EstadoRuta[]'
    */
   export type ListEnumEstadoRutaFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'EstadoRuta[]'>
-    
-
-
-  /**
-   * Reference to a field of type 'TipoVehiculo'
-   */
-  export type EnumTipoVehiculoFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'TipoVehiculo'>
-    
-
-
-  /**
-   * Reference to a field of type 'TipoVehiculo[]'
-   */
-  export type ListEnumTipoVehiculoFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'TipoVehiculo[]'>
     
 
 
@@ -45706,6 +45936,7 @@ export namespace Prisma {
     tarifasDestino?: Tarifas_sucursalesListRelationFilter
     tarifasOrigen?: Tarifas_sucursalesListRelationFilter
     usuarios?: UsuariosListRelationFilter
+    vehiculos?: VehiculosListRelationFilter
     rutasOrigen?: RutasListRelationFilter
     rutasDestino?: RutasListRelationFilter
   }
@@ -45726,6 +45957,7 @@ export namespace Prisma {
     tarifasDestino?: tarifas_sucursalesOrderByRelationAggregateInput
     tarifasOrigen?: tarifas_sucursalesOrderByRelationAggregateInput
     usuarios?: usuariosOrderByRelationAggregateInput
+    vehiculos?: vehiculosOrderByRelationAggregateInput
     rutasOrigen?: rutasOrderByRelationAggregateInput
     rutasDestino?: rutasOrderByRelationAggregateInput
   }
@@ -45749,6 +45981,7 @@ export namespace Prisma {
     tarifasDestino?: Tarifas_sucursalesListRelationFilter
     tarifasOrigen?: Tarifas_sucursalesListRelationFilter
     usuarios?: UsuariosListRelationFilter
+    vehiculos?: VehiculosListRelationFilter
     rutasOrigen?: RutasListRelationFilter
     rutasDestino?: RutasListRelationFilter
   }, "id">
@@ -46103,27 +46336,49 @@ export namespace Prisma {
     NOT?: vehiculosWhereInput | vehiculosWhereInput[]
     id?: StringFilter<"vehiculos"> | string
     placa?: StringFilter<"vehiculos"> | string
+    marca?: StringNullableFilter<"vehiculos"> | string | null
     modelo?: StringNullableFilter<"vehiculos"> | string | null
+    año?: IntNullableFilter<"vehiculos"> | number | null
     capacidad?: FloatNullableFilter<"vehiculos"> | number | null
+    pesoMaximo?: FloatFilter<"vehiculos"> | number
+    volumenMaximo?: FloatNullableFilter<"vehiculos"> | number | null
+    tipoVehiculo?: EnumTipoVehiculoNullableFilter<"vehiculos"> | $Enums.TipoVehiculo | null
+    estado?: EnumEstadoVehiculoFilter<"vehiculos"> | $Enums.EstadoVehiculo
+    sucursalId?: StringNullableFilter<"vehiculos"> | string | null
     conductorId?: StringNullableFilter<"vehiculos"> | string | null
+    soat?: DateTimeNullableFilter<"vehiculos"> | Date | string | null
+    revision?: DateTimeNullableFilter<"vehiculos"> | Date | string | null
+    observaciones?: StringNullableFilter<"vehiculos"> | string | null
     createdAt?: DateTimeFilter<"vehiculos"> | Date | string
     updatedAt?: DateTimeFilter<"vehiculos"> | Date | string
     deletedAt?: DateTimeNullableFilter<"vehiculos"> | Date | string | null
     envios?: EnviosListRelationFilter
     usuarios?: XOR<UsuariosNullableScalarRelationFilter, usuariosWhereInput> | null
+    sucursal?: XOR<SucursalesNullableScalarRelationFilter, sucursalesWhereInput> | null
   }
 
   export type vehiculosOrderByWithRelationInput = {
     id?: SortOrder
     placa?: SortOrder
+    marca?: SortOrderInput | SortOrder
     modelo?: SortOrderInput | SortOrder
+    año?: SortOrderInput | SortOrder
     capacidad?: SortOrderInput | SortOrder
+    pesoMaximo?: SortOrder
+    volumenMaximo?: SortOrderInput | SortOrder
+    tipoVehiculo?: SortOrderInput | SortOrder
+    estado?: SortOrder
+    sucursalId?: SortOrderInput | SortOrder
     conductorId?: SortOrderInput | SortOrder
+    soat?: SortOrderInput | SortOrder
+    revision?: SortOrderInput | SortOrder
+    observaciones?: SortOrderInput | SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
     deletedAt?: SortOrderInput | SortOrder
     envios?: enviosOrderByRelationAggregateInput
     usuarios?: usuariosOrderByWithRelationInput
+    sucursal?: sucursalesOrderByWithRelationInput
   }
 
   export type vehiculosWhereUniqueInput = Prisma.AtLeast<{
@@ -46133,21 +46388,42 @@ export namespace Prisma {
     AND?: vehiculosWhereInput | vehiculosWhereInput[]
     OR?: vehiculosWhereInput[]
     NOT?: vehiculosWhereInput | vehiculosWhereInput[]
+    marca?: StringNullableFilter<"vehiculos"> | string | null
     modelo?: StringNullableFilter<"vehiculos"> | string | null
+    año?: IntNullableFilter<"vehiculos"> | number | null
     capacidad?: FloatNullableFilter<"vehiculos"> | number | null
+    pesoMaximo?: FloatFilter<"vehiculos"> | number
+    volumenMaximo?: FloatNullableFilter<"vehiculos"> | number | null
+    tipoVehiculo?: EnumTipoVehiculoNullableFilter<"vehiculos"> | $Enums.TipoVehiculo | null
+    estado?: EnumEstadoVehiculoFilter<"vehiculos"> | $Enums.EstadoVehiculo
+    sucursalId?: StringNullableFilter<"vehiculos"> | string | null
+    soat?: DateTimeNullableFilter<"vehiculos"> | Date | string | null
+    revision?: DateTimeNullableFilter<"vehiculos"> | Date | string | null
+    observaciones?: StringNullableFilter<"vehiculos"> | string | null
     createdAt?: DateTimeFilter<"vehiculos"> | Date | string
     updatedAt?: DateTimeFilter<"vehiculos"> | Date | string
     deletedAt?: DateTimeNullableFilter<"vehiculos"> | Date | string | null
     envios?: EnviosListRelationFilter
     usuarios?: XOR<UsuariosNullableScalarRelationFilter, usuariosWhereInput> | null
+    sucursal?: XOR<SucursalesNullableScalarRelationFilter, sucursalesWhereInput> | null
   }, "id" | "placa" | "conductorId">
 
   export type vehiculosOrderByWithAggregationInput = {
     id?: SortOrder
     placa?: SortOrder
+    marca?: SortOrderInput | SortOrder
     modelo?: SortOrderInput | SortOrder
+    año?: SortOrderInput | SortOrder
     capacidad?: SortOrderInput | SortOrder
+    pesoMaximo?: SortOrder
+    volumenMaximo?: SortOrderInput | SortOrder
+    tipoVehiculo?: SortOrderInput | SortOrder
+    estado?: SortOrder
+    sucursalId?: SortOrderInput | SortOrder
     conductorId?: SortOrderInput | SortOrder
+    soat?: SortOrderInput | SortOrder
+    revision?: SortOrderInput | SortOrder
+    observaciones?: SortOrderInput | SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
     deletedAt?: SortOrderInput | SortOrder
@@ -46164,9 +46440,19 @@ export namespace Prisma {
     NOT?: vehiculosScalarWhereWithAggregatesInput | vehiculosScalarWhereWithAggregatesInput[]
     id?: StringWithAggregatesFilter<"vehiculos"> | string
     placa?: StringWithAggregatesFilter<"vehiculos"> | string
+    marca?: StringNullableWithAggregatesFilter<"vehiculos"> | string | null
     modelo?: StringNullableWithAggregatesFilter<"vehiculos"> | string | null
+    año?: IntNullableWithAggregatesFilter<"vehiculos"> | number | null
     capacidad?: FloatNullableWithAggregatesFilter<"vehiculos"> | number | null
+    pesoMaximo?: FloatWithAggregatesFilter<"vehiculos"> | number
+    volumenMaximo?: FloatNullableWithAggregatesFilter<"vehiculos"> | number | null
+    tipoVehiculo?: EnumTipoVehiculoNullableWithAggregatesFilter<"vehiculos"> | $Enums.TipoVehiculo | null
+    estado?: EnumEstadoVehiculoWithAggregatesFilter<"vehiculos"> | $Enums.EstadoVehiculo
+    sucursalId?: StringNullableWithAggregatesFilter<"vehiculos"> | string | null
     conductorId?: StringNullableWithAggregatesFilter<"vehiculos"> | string | null
+    soat?: DateTimeNullableWithAggregatesFilter<"vehiculos"> | Date | string | null
+    revision?: DateTimeNullableWithAggregatesFilter<"vehiculos"> | Date | string | null
+    observaciones?: StringNullableWithAggregatesFilter<"vehiculos"> | string | null
     createdAt?: DateTimeWithAggregatesFilter<"vehiculos"> | Date | string
     updatedAt?: DateTimeWithAggregatesFilter<"vehiculos"> | Date | string
     deletedAt?: DateTimeNullableWithAggregatesFilter<"vehiculos"> | Date | string | null
@@ -49387,6 +49673,7 @@ export namespace Prisma {
     tarifasDestino?: tarifas_sucursalesCreateNestedManyWithoutSucursalDestinoInput
     tarifasOrigen?: tarifas_sucursalesCreateNestedManyWithoutSucursalOrigenInput
     usuarios?: usuariosCreateNestedManyWithoutSucursalesInput
+    vehiculos?: vehiculosCreateNestedManyWithoutSucursalInput
     rutasOrigen?: rutasCreateNestedManyWithoutSucursalOrigenInput
     rutasDestino?: rutasCreateNestedManyWithoutSucursalDestinoInput
   }
@@ -49407,6 +49694,7 @@ export namespace Prisma {
     tarifasDestino?: tarifas_sucursalesUncheckedCreateNestedManyWithoutSucursalDestinoInput
     tarifasOrigen?: tarifas_sucursalesUncheckedCreateNestedManyWithoutSucursalOrigenInput
     usuarios?: usuariosUncheckedCreateNestedManyWithoutSucursalesInput
+    vehiculos?: vehiculosUncheckedCreateNestedManyWithoutSucursalInput
     rutasOrigen?: rutasUncheckedCreateNestedManyWithoutSucursalOrigenInput
     rutasDestino?: rutasUncheckedCreateNestedManyWithoutSucursalDestinoInput
   }
@@ -49427,6 +49715,7 @@ export namespace Prisma {
     tarifasDestino?: tarifas_sucursalesUpdateManyWithoutSucursalDestinoNestedInput
     tarifasOrigen?: tarifas_sucursalesUpdateManyWithoutSucursalOrigenNestedInput
     usuarios?: usuariosUpdateManyWithoutSucursalesNestedInput
+    vehiculos?: vehiculosUpdateManyWithoutSucursalNestedInput
     rutasOrigen?: rutasUpdateManyWithoutSucursalOrigenNestedInput
     rutasDestino?: rutasUpdateManyWithoutSucursalDestinoNestedInput
   }
@@ -49447,6 +49736,7 @@ export namespace Prisma {
     tarifasDestino?: tarifas_sucursalesUncheckedUpdateManyWithoutSucursalDestinoNestedInput
     tarifasOrigen?: tarifas_sucursalesUncheckedUpdateManyWithoutSucursalOrigenNestedInput
     usuarios?: usuariosUncheckedUpdateManyWithoutSucursalesNestedInput
+    vehiculos?: vehiculosUncheckedUpdateManyWithoutSucursalNestedInput
     rutasOrigen?: rutasUncheckedUpdateManyWithoutSucursalOrigenNestedInput
     rutasDestino?: rutasUncheckedUpdateManyWithoutSucursalDestinoNestedInput
   }
@@ -49847,23 +50137,43 @@ export namespace Prisma {
   }
 
   export type vehiculosCreateInput = {
-    id: string
+    id?: string
     placa: string
+    marca?: string | null
     modelo?: string | null
+    año?: number | null
     capacidad?: number | null
+    pesoMaximo: number
+    volumenMaximo?: number | null
+    tipoVehiculo?: $Enums.TipoVehiculo | null
+    estado?: $Enums.EstadoVehiculo
+    soat?: Date | string | null
+    revision?: Date | string | null
+    observaciones?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
     deletedAt?: Date | string | null
     envios?: enviosCreateNestedManyWithoutVehiculoInput
     usuarios?: usuariosCreateNestedOneWithoutVehiculosInput
+    sucursal?: sucursalesCreateNestedOneWithoutVehiculosInput
   }
 
   export type vehiculosUncheckedCreateInput = {
-    id: string
+    id?: string
     placa: string
+    marca?: string | null
     modelo?: string | null
+    año?: number | null
     capacidad?: number | null
+    pesoMaximo: number
+    volumenMaximo?: number | null
+    tipoVehiculo?: $Enums.TipoVehiculo | null
+    estado?: $Enums.EstadoVehiculo
+    sucursalId?: string | null
     conductorId?: string | null
+    soat?: Date | string | null
+    revision?: Date | string | null
+    observaciones?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
     deletedAt?: Date | string | null
@@ -49873,21 +50183,41 @@ export namespace Prisma {
   export type vehiculosUpdateInput = {
     id?: StringFieldUpdateOperationsInput | string
     placa?: StringFieldUpdateOperationsInput | string
+    marca?: NullableStringFieldUpdateOperationsInput | string | null
     modelo?: NullableStringFieldUpdateOperationsInput | string | null
+    año?: NullableIntFieldUpdateOperationsInput | number | null
     capacidad?: NullableFloatFieldUpdateOperationsInput | number | null
+    pesoMaximo?: FloatFieldUpdateOperationsInput | number
+    volumenMaximo?: NullableFloatFieldUpdateOperationsInput | number | null
+    tipoVehiculo?: NullableEnumTipoVehiculoFieldUpdateOperationsInput | $Enums.TipoVehiculo | null
+    estado?: EnumEstadoVehiculoFieldUpdateOperationsInput | $Enums.EstadoVehiculo
+    soat?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    revision?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    observaciones?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     deletedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     envios?: enviosUpdateManyWithoutVehiculoNestedInput
     usuarios?: usuariosUpdateOneWithoutVehiculosNestedInput
+    sucursal?: sucursalesUpdateOneWithoutVehiculosNestedInput
   }
 
   export type vehiculosUncheckedUpdateInput = {
     id?: StringFieldUpdateOperationsInput | string
     placa?: StringFieldUpdateOperationsInput | string
+    marca?: NullableStringFieldUpdateOperationsInput | string | null
     modelo?: NullableStringFieldUpdateOperationsInput | string | null
+    año?: NullableIntFieldUpdateOperationsInput | number | null
     capacidad?: NullableFloatFieldUpdateOperationsInput | number | null
+    pesoMaximo?: FloatFieldUpdateOperationsInput | number
+    volumenMaximo?: NullableFloatFieldUpdateOperationsInput | number | null
+    tipoVehiculo?: NullableEnumTipoVehiculoFieldUpdateOperationsInput | $Enums.TipoVehiculo | null
+    estado?: EnumEstadoVehiculoFieldUpdateOperationsInput | $Enums.EstadoVehiculo
+    sucursalId?: NullableStringFieldUpdateOperationsInput | string | null
     conductorId?: NullableStringFieldUpdateOperationsInput | string | null
+    soat?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    revision?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    observaciones?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     deletedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -49895,11 +50225,21 @@ export namespace Prisma {
   }
 
   export type vehiculosCreateManyInput = {
-    id: string
+    id?: string
     placa: string
+    marca?: string | null
     modelo?: string | null
+    año?: number | null
     capacidad?: number | null
+    pesoMaximo: number
+    volumenMaximo?: number | null
+    tipoVehiculo?: $Enums.TipoVehiculo | null
+    estado?: $Enums.EstadoVehiculo
+    sucursalId?: string | null
     conductorId?: string | null
+    soat?: Date | string | null
+    revision?: Date | string | null
+    observaciones?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
     deletedAt?: Date | string | null
@@ -49908,8 +50248,17 @@ export namespace Prisma {
   export type vehiculosUpdateManyMutationInput = {
     id?: StringFieldUpdateOperationsInput | string
     placa?: StringFieldUpdateOperationsInput | string
+    marca?: NullableStringFieldUpdateOperationsInput | string | null
     modelo?: NullableStringFieldUpdateOperationsInput | string | null
+    año?: NullableIntFieldUpdateOperationsInput | number | null
     capacidad?: NullableFloatFieldUpdateOperationsInput | number | null
+    pesoMaximo?: FloatFieldUpdateOperationsInput | number
+    volumenMaximo?: NullableFloatFieldUpdateOperationsInput | number | null
+    tipoVehiculo?: NullableEnumTipoVehiculoFieldUpdateOperationsInput | $Enums.TipoVehiculo | null
+    estado?: EnumEstadoVehiculoFieldUpdateOperationsInput | $Enums.EstadoVehiculo
+    soat?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    revision?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    observaciones?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     deletedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -49918,9 +50267,19 @@ export namespace Prisma {
   export type vehiculosUncheckedUpdateManyInput = {
     id?: StringFieldUpdateOperationsInput | string
     placa?: StringFieldUpdateOperationsInput | string
+    marca?: NullableStringFieldUpdateOperationsInput | string | null
     modelo?: NullableStringFieldUpdateOperationsInput | string | null
+    año?: NullableIntFieldUpdateOperationsInput | number | null
     capacidad?: NullableFloatFieldUpdateOperationsInput | number | null
+    pesoMaximo?: FloatFieldUpdateOperationsInput | number
+    volumenMaximo?: NullableFloatFieldUpdateOperationsInput | number | null
+    tipoVehiculo?: NullableEnumTipoVehiculoFieldUpdateOperationsInput | $Enums.TipoVehiculo | null
+    estado?: EnumEstadoVehiculoFieldUpdateOperationsInput | $Enums.EstadoVehiculo
+    sucursalId?: NullableStringFieldUpdateOperationsInput | string | null
     conductorId?: NullableStringFieldUpdateOperationsInput | string | null
+    soat?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    revision?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    observaciones?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     deletedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -53331,6 +53690,12 @@ export namespace Prisma {
     none?: usuariosWhereInput
   }
 
+  export type VehiculosListRelationFilter = {
+    every?: vehiculosWhereInput
+    some?: vehiculosWhereInput
+    none?: vehiculosWhereInput
+  }
+
   export type RutasListRelationFilter = {
     every?: rutasWhereInput
     some?: rutasWhereInput
@@ -53342,6 +53707,10 @@ export namespace Prisma {
   }
 
   export type usuariosOrderByRelationAggregateInput = {
+    _count?: SortOrder
+  }
+
+  export type vehiculosOrderByRelationAggregateInput = {
     _count?: SortOrder
   }
 
@@ -53690,27 +54059,64 @@ export namespace Prisma {
     _max?: NestedEnumRolFilter<$PrismaModel>
   }
 
+  export type EnumTipoVehiculoNullableFilter<$PrismaModel = never> = {
+    equals?: $Enums.TipoVehiculo | EnumTipoVehiculoFieldRefInput<$PrismaModel> | null
+    in?: $Enums.TipoVehiculo[] | ListEnumTipoVehiculoFieldRefInput<$PrismaModel> | null
+    notIn?: $Enums.TipoVehiculo[] | ListEnumTipoVehiculoFieldRefInput<$PrismaModel> | null
+    not?: NestedEnumTipoVehiculoNullableFilter<$PrismaModel> | $Enums.TipoVehiculo | null
+  }
+
+  export type EnumEstadoVehiculoFilter<$PrismaModel = never> = {
+    equals?: $Enums.EstadoVehiculo | EnumEstadoVehiculoFieldRefInput<$PrismaModel>
+    in?: $Enums.EstadoVehiculo[] | ListEnumEstadoVehiculoFieldRefInput<$PrismaModel>
+    notIn?: $Enums.EstadoVehiculo[] | ListEnumEstadoVehiculoFieldRefInput<$PrismaModel>
+    not?: NestedEnumEstadoVehiculoFilter<$PrismaModel> | $Enums.EstadoVehiculo
+  }
+
   export type vehiculosCountOrderByAggregateInput = {
     id?: SortOrder
     placa?: SortOrder
+    marca?: SortOrder
     modelo?: SortOrder
+    año?: SortOrder
     capacidad?: SortOrder
+    pesoMaximo?: SortOrder
+    volumenMaximo?: SortOrder
+    tipoVehiculo?: SortOrder
+    estado?: SortOrder
+    sucursalId?: SortOrder
     conductorId?: SortOrder
+    soat?: SortOrder
+    revision?: SortOrder
+    observaciones?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
     deletedAt?: SortOrder
   }
 
   export type vehiculosAvgOrderByAggregateInput = {
+    año?: SortOrder
     capacidad?: SortOrder
+    pesoMaximo?: SortOrder
+    volumenMaximo?: SortOrder
   }
 
   export type vehiculosMaxOrderByAggregateInput = {
     id?: SortOrder
     placa?: SortOrder
+    marca?: SortOrder
     modelo?: SortOrder
+    año?: SortOrder
     capacidad?: SortOrder
+    pesoMaximo?: SortOrder
+    volumenMaximo?: SortOrder
+    tipoVehiculo?: SortOrder
+    estado?: SortOrder
+    sucursalId?: SortOrder
     conductorId?: SortOrder
+    soat?: SortOrder
+    revision?: SortOrder
+    observaciones?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
     deletedAt?: SortOrder
@@ -53719,16 +54125,49 @@ export namespace Prisma {
   export type vehiculosMinOrderByAggregateInput = {
     id?: SortOrder
     placa?: SortOrder
+    marca?: SortOrder
     modelo?: SortOrder
+    año?: SortOrder
     capacidad?: SortOrder
+    pesoMaximo?: SortOrder
+    volumenMaximo?: SortOrder
+    tipoVehiculo?: SortOrder
+    estado?: SortOrder
+    sucursalId?: SortOrder
     conductorId?: SortOrder
+    soat?: SortOrder
+    revision?: SortOrder
+    observaciones?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
     deletedAt?: SortOrder
   }
 
   export type vehiculosSumOrderByAggregateInput = {
+    año?: SortOrder
     capacidad?: SortOrder
+    pesoMaximo?: SortOrder
+    volumenMaximo?: SortOrder
+  }
+
+  export type EnumTipoVehiculoNullableWithAggregatesFilter<$PrismaModel = never> = {
+    equals?: $Enums.TipoVehiculo | EnumTipoVehiculoFieldRefInput<$PrismaModel> | null
+    in?: $Enums.TipoVehiculo[] | ListEnumTipoVehiculoFieldRefInput<$PrismaModel> | null
+    notIn?: $Enums.TipoVehiculo[] | ListEnumTipoVehiculoFieldRefInput<$PrismaModel> | null
+    not?: NestedEnumTipoVehiculoNullableWithAggregatesFilter<$PrismaModel> | $Enums.TipoVehiculo | null
+    _count?: NestedIntNullableFilter<$PrismaModel>
+    _min?: NestedEnumTipoVehiculoNullableFilter<$PrismaModel>
+    _max?: NestedEnumTipoVehiculoNullableFilter<$PrismaModel>
+  }
+
+  export type EnumEstadoVehiculoWithAggregatesFilter<$PrismaModel = never> = {
+    equals?: $Enums.EstadoVehiculo | EnumEstadoVehiculoFieldRefInput<$PrismaModel>
+    in?: $Enums.EstadoVehiculo[] | ListEnumEstadoVehiculoFieldRefInput<$PrismaModel>
+    notIn?: $Enums.EstadoVehiculo[] | ListEnumEstadoVehiculoFieldRefInput<$PrismaModel>
+    not?: NestedEnumEstadoVehiculoWithAggregatesFilter<$PrismaModel> | $Enums.EstadoVehiculo
+    _count?: NestedIntFilter<$PrismaModel>
+    _min?: NestedEnumEstadoVehiculoFilter<$PrismaModel>
+    _max?: NestedEnumEstadoVehiculoFilter<$PrismaModel>
   }
 
   export type verification_tokensIdentifierTokenCompoundUniqueInput = {
@@ -54600,13 +55039,6 @@ export namespace Prisma {
     notIn?: $Enums.EstadoRuta[] | ListEnumEstadoRutaFieldRefInput<$PrismaModel>
     not?: NestedEnumEstadoRutaFilter<$PrismaModel> | $Enums.EstadoRuta
   }
-
-  export type EnumTipoVehiculoNullableFilter<$PrismaModel = never> = {
-    equals?: $Enums.TipoVehiculo | EnumTipoVehiculoFieldRefInput<$PrismaModel> | null
-    in?: $Enums.TipoVehiculo[] | ListEnumTipoVehiculoFieldRefInput<$PrismaModel> | null
-    notIn?: $Enums.TipoVehiculo[] | ListEnumTipoVehiculoFieldRefInput<$PrismaModel> | null
-    not?: NestedEnumTipoVehiculoNullableFilter<$PrismaModel> | $Enums.TipoVehiculo | null
-  }
   export type JsonNullableFilter<$PrismaModel = never> =
     | PatchUndefined<
         Either<Required<JsonNullableFilterBase<$PrismaModel>>, Exclude<keyof Required<JsonNullableFilterBase<$PrismaModel>>, 'path'>>,
@@ -54743,16 +55175,6 @@ export namespace Prisma {
     _count?: NestedIntFilter<$PrismaModel>
     _min?: NestedEnumEstadoRutaFilter<$PrismaModel>
     _max?: NestedEnumEstadoRutaFilter<$PrismaModel>
-  }
-
-  export type EnumTipoVehiculoNullableWithAggregatesFilter<$PrismaModel = never> = {
-    equals?: $Enums.TipoVehiculo | EnumTipoVehiculoFieldRefInput<$PrismaModel> | null
-    in?: $Enums.TipoVehiculo[] | ListEnumTipoVehiculoFieldRefInput<$PrismaModel> | null
-    notIn?: $Enums.TipoVehiculo[] | ListEnumTipoVehiculoFieldRefInput<$PrismaModel> | null
-    not?: NestedEnumTipoVehiculoNullableWithAggregatesFilter<$PrismaModel> | $Enums.TipoVehiculo | null
-    _count?: NestedIntNullableFilter<$PrismaModel>
-    _min?: NestedEnumTipoVehiculoNullableFilter<$PrismaModel>
-    _max?: NestedEnumTipoVehiculoNullableFilter<$PrismaModel>
   }
   export type JsonNullableWithAggregatesFilter<$PrismaModel = never> =
     | PatchUndefined<
@@ -56092,6 +56514,13 @@ export namespace Prisma {
     connect?: usuariosWhereUniqueInput | usuariosWhereUniqueInput[]
   }
 
+  export type vehiculosCreateNestedManyWithoutSucursalInput = {
+    create?: XOR<vehiculosCreateWithoutSucursalInput, vehiculosUncheckedCreateWithoutSucursalInput> | vehiculosCreateWithoutSucursalInput[] | vehiculosUncheckedCreateWithoutSucursalInput[]
+    connectOrCreate?: vehiculosCreateOrConnectWithoutSucursalInput | vehiculosCreateOrConnectWithoutSucursalInput[]
+    createMany?: vehiculosCreateManySucursalInputEnvelope
+    connect?: vehiculosWhereUniqueInput | vehiculosWhereUniqueInput[]
+  }
+
   export type rutasCreateNestedManyWithoutSucursalOrigenInput = {
     create?: XOR<rutasCreateWithoutSucursalOrigenInput, rutasUncheckedCreateWithoutSucursalOrigenInput> | rutasCreateWithoutSucursalOrigenInput[] | rutasUncheckedCreateWithoutSucursalOrigenInput[]
     connectOrCreate?: rutasCreateOrConnectWithoutSucursalOrigenInput | rutasCreateOrConnectWithoutSucursalOrigenInput[]
@@ -56153,6 +56582,13 @@ export namespace Prisma {
     connectOrCreate?: usuariosCreateOrConnectWithoutSucursalesInput | usuariosCreateOrConnectWithoutSucursalesInput[]
     createMany?: usuariosCreateManySucursalesInputEnvelope
     connect?: usuariosWhereUniqueInput | usuariosWhereUniqueInput[]
+  }
+
+  export type vehiculosUncheckedCreateNestedManyWithoutSucursalInput = {
+    create?: XOR<vehiculosCreateWithoutSucursalInput, vehiculosUncheckedCreateWithoutSucursalInput> | vehiculosCreateWithoutSucursalInput[] | vehiculosUncheckedCreateWithoutSucursalInput[]
+    connectOrCreate?: vehiculosCreateOrConnectWithoutSucursalInput | vehiculosCreateOrConnectWithoutSucursalInput[]
+    createMany?: vehiculosCreateManySucursalInputEnvelope
+    connect?: vehiculosWhereUniqueInput | vehiculosWhereUniqueInput[]
   }
 
   export type rutasUncheckedCreateNestedManyWithoutSucursalOrigenInput = {
@@ -56265,6 +56701,20 @@ export namespace Prisma {
     update?: usuariosUpdateWithWhereUniqueWithoutSucursalesInput | usuariosUpdateWithWhereUniqueWithoutSucursalesInput[]
     updateMany?: usuariosUpdateManyWithWhereWithoutSucursalesInput | usuariosUpdateManyWithWhereWithoutSucursalesInput[]
     deleteMany?: usuariosScalarWhereInput | usuariosScalarWhereInput[]
+  }
+
+  export type vehiculosUpdateManyWithoutSucursalNestedInput = {
+    create?: XOR<vehiculosCreateWithoutSucursalInput, vehiculosUncheckedCreateWithoutSucursalInput> | vehiculosCreateWithoutSucursalInput[] | vehiculosUncheckedCreateWithoutSucursalInput[]
+    connectOrCreate?: vehiculosCreateOrConnectWithoutSucursalInput | vehiculosCreateOrConnectWithoutSucursalInput[]
+    upsert?: vehiculosUpsertWithWhereUniqueWithoutSucursalInput | vehiculosUpsertWithWhereUniqueWithoutSucursalInput[]
+    createMany?: vehiculosCreateManySucursalInputEnvelope
+    set?: vehiculosWhereUniqueInput | vehiculosWhereUniqueInput[]
+    disconnect?: vehiculosWhereUniqueInput | vehiculosWhereUniqueInput[]
+    delete?: vehiculosWhereUniqueInput | vehiculosWhereUniqueInput[]
+    connect?: vehiculosWhereUniqueInput | vehiculosWhereUniqueInput[]
+    update?: vehiculosUpdateWithWhereUniqueWithoutSucursalInput | vehiculosUpdateWithWhereUniqueWithoutSucursalInput[]
+    updateMany?: vehiculosUpdateManyWithWhereWithoutSucursalInput | vehiculosUpdateManyWithWhereWithoutSucursalInput[]
+    deleteMany?: vehiculosScalarWhereInput | vehiculosScalarWhereInput[]
   }
 
   export type rutasUpdateManyWithoutSucursalOrigenNestedInput = {
@@ -56391,6 +56841,20 @@ export namespace Prisma {
     update?: usuariosUpdateWithWhereUniqueWithoutSucursalesInput | usuariosUpdateWithWhereUniqueWithoutSucursalesInput[]
     updateMany?: usuariosUpdateManyWithWhereWithoutSucursalesInput | usuariosUpdateManyWithWhereWithoutSucursalesInput[]
     deleteMany?: usuariosScalarWhereInput | usuariosScalarWhereInput[]
+  }
+
+  export type vehiculosUncheckedUpdateManyWithoutSucursalNestedInput = {
+    create?: XOR<vehiculosCreateWithoutSucursalInput, vehiculosUncheckedCreateWithoutSucursalInput> | vehiculosCreateWithoutSucursalInput[] | vehiculosUncheckedCreateWithoutSucursalInput[]
+    connectOrCreate?: vehiculosCreateOrConnectWithoutSucursalInput | vehiculosCreateOrConnectWithoutSucursalInput[]
+    upsert?: vehiculosUpsertWithWhereUniqueWithoutSucursalInput | vehiculosUpsertWithWhereUniqueWithoutSucursalInput[]
+    createMany?: vehiculosCreateManySucursalInputEnvelope
+    set?: vehiculosWhereUniqueInput | vehiculosWhereUniqueInput[]
+    disconnect?: vehiculosWhereUniqueInput | vehiculosWhereUniqueInput[]
+    delete?: vehiculosWhereUniqueInput | vehiculosWhereUniqueInput[]
+    connect?: vehiculosWhereUniqueInput | vehiculosWhereUniqueInput[]
+    update?: vehiculosUpdateWithWhereUniqueWithoutSucursalInput | vehiculosUpdateWithWhereUniqueWithoutSucursalInput[]
+    updateMany?: vehiculosUpdateManyWithWhereWithoutSucursalInput | vehiculosUpdateManyWithWhereWithoutSucursalInput[]
+    deleteMany?: vehiculosScalarWhereInput | vehiculosScalarWhereInput[]
   }
 
   export type rutasUncheckedUpdateManyWithoutSucursalOrigenNestedInput = {
@@ -56960,11 +57424,25 @@ export namespace Prisma {
     connect?: usuariosWhereUniqueInput
   }
 
+  export type sucursalesCreateNestedOneWithoutVehiculosInput = {
+    create?: XOR<sucursalesCreateWithoutVehiculosInput, sucursalesUncheckedCreateWithoutVehiculosInput>
+    connectOrCreate?: sucursalesCreateOrConnectWithoutVehiculosInput
+    connect?: sucursalesWhereUniqueInput
+  }
+
   export type enviosUncheckedCreateNestedManyWithoutVehiculoInput = {
     create?: XOR<enviosCreateWithoutVehiculoInput, enviosUncheckedCreateWithoutVehiculoInput> | enviosCreateWithoutVehiculoInput[] | enviosUncheckedCreateWithoutVehiculoInput[]
     connectOrCreate?: enviosCreateOrConnectWithoutVehiculoInput | enviosCreateOrConnectWithoutVehiculoInput[]
     createMany?: enviosCreateManyVehiculoInputEnvelope
     connect?: enviosWhereUniqueInput | enviosWhereUniqueInput[]
+  }
+
+  export type NullableEnumTipoVehiculoFieldUpdateOperationsInput = {
+    set?: $Enums.TipoVehiculo | null
+  }
+
+  export type EnumEstadoVehiculoFieldUpdateOperationsInput = {
+    set?: $Enums.EstadoVehiculo
   }
 
   export type enviosUpdateManyWithoutVehiculoNestedInput = {
@@ -56989,6 +57467,16 @@ export namespace Prisma {
     delete?: usuariosWhereInput | boolean
     connect?: usuariosWhereUniqueInput
     update?: XOR<XOR<usuariosUpdateToOneWithWhereWithoutVehiculosInput, usuariosUpdateWithoutVehiculosInput>, usuariosUncheckedUpdateWithoutVehiculosInput>
+  }
+
+  export type sucursalesUpdateOneWithoutVehiculosNestedInput = {
+    create?: XOR<sucursalesCreateWithoutVehiculosInput, sucursalesUncheckedCreateWithoutVehiculosInput>
+    connectOrCreate?: sucursalesCreateOrConnectWithoutVehiculosInput
+    upsert?: sucursalesUpsertWithoutVehiculosInput
+    disconnect?: sucursalesWhereInput | boolean
+    delete?: sucursalesWhereInput | boolean
+    connect?: sucursalesWhereUniqueInput
+    update?: XOR<XOR<sucursalesUpdateToOneWithWhereWithoutVehiculosInput, sucursalesUpdateWithoutVehiculosInput>, sucursalesUncheckedUpdateWithoutVehiculosInput>
   }
 
   export type enviosUncheckedUpdateManyWithoutVehiculoNestedInput = {
@@ -57529,10 +58017,6 @@ export namespace Prisma {
 
   export type EnumEstadoRutaFieldUpdateOperationsInput = {
     set?: $Enums.EstadoRuta
-  }
-
-  export type NullableEnumTipoVehiculoFieldUpdateOperationsInput = {
-    set?: $Enums.TipoVehiculo | null
   }
 
   export type sucursalesUpdateOneRequiredWithoutRutasOrigenNestedInput = {
@@ -58168,6 +58652,40 @@ export namespace Prisma {
     _max?: NestedEnumRolFilter<$PrismaModel>
   }
 
+  export type NestedEnumTipoVehiculoNullableFilter<$PrismaModel = never> = {
+    equals?: $Enums.TipoVehiculo | EnumTipoVehiculoFieldRefInput<$PrismaModel> | null
+    in?: $Enums.TipoVehiculo[] | ListEnumTipoVehiculoFieldRefInput<$PrismaModel> | null
+    notIn?: $Enums.TipoVehiculo[] | ListEnumTipoVehiculoFieldRefInput<$PrismaModel> | null
+    not?: NestedEnumTipoVehiculoNullableFilter<$PrismaModel> | $Enums.TipoVehiculo | null
+  }
+
+  export type NestedEnumEstadoVehiculoFilter<$PrismaModel = never> = {
+    equals?: $Enums.EstadoVehiculo | EnumEstadoVehiculoFieldRefInput<$PrismaModel>
+    in?: $Enums.EstadoVehiculo[] | ListEnumEstadoVehiculoFieldRefInput<$PrismaModel>
+    notIn?: $Enums.EstadoVehiculo[] | ListEnumEstadoVehiculoFieldRefInput<$PrismaModel>
+    not?: NestedEnumEstadoVehiculoFilter<$PrismaModel> | $Enums.EstadoVehiculo
+  }
+
+  export type NestedEnumTipoVehiculoNullableWithAggregatesFilter<$PrismaModel = never> = {
+    equals?: $Enums.TipoVehiculo | EnumTipoVehiculoFieldRefInput<$PrismaModel> | null
+    in?: $Enums.TipoVehiculo[] | ListEnumTipoVehiculoFieldRefInput<$PrismaModel> | null
+    notIn?: $Enums.TipoVehiculo[] | ListEnumTipoVehiculoFieldRefInput<$PrismaModel> | null
+    not?: NestedEnumTipoVehiculoNullableWithAggregatesFilter<$PrismaModel> | $Enums.TipoVehiculo | null
+    _count?: NestedIntNullableFilter<$PrismaModel>
+    _min?: NestedEnumTipoVehiculoNullableFilter<$PrismaModel>
+    _max?: NestedEnumTipoVehiculoNullableFilter<$PrismaModel>
+  }
+
+  export type NestedEnumEstadoVehiculoWithAggregatesFilter<$PrismaModel = never> = {
+    equals?: $Enums.EstadoVehiculo | EnumEstadoVehiculoFieldRefInput<$PrismaModel>
+    in?: $Enums.EstadoVehiculo[] | ListEnumEstadoVehiculoFieldRefInput<$PrismaModel>
+    notIn?: $Enums.EstadoVehiculo[] | ListEnumEstadoVehiculoFieldRefInput<$PrismaModel>
+    not?: NestedEnumEstadoVehiculoWithAggregatesFilter<$PrismaModel> | $Enums.EstadoVehiculo
+    _count?: NestedIntFilter<$PrismaModel>
+    _min?: NestedEnumEstadoVehiculoFilter<$PrismaModel>
+    _max?: NestedEnumEstadoVehiculoFilter<$PrismaModel>
+  }
+
   export type NestedEnumTipoServicioFilter<$PrismaModel = never> = {
     equals?: $Enums.TipoServicio | EnumTipoServicioFieldRefInput<$PrismaModel>
     in?: $Enums.TipoServicio[] | ListEnumTipoServicioFieldRefInput<$PrismaModel>
@@ -58267,13 +58785,6 @@ export namespace Prisma {
     not?: NestedEnumEstadoRutaFilter<$PrismaModel> | $Enums.EstadoRuta
   }
 
-  export type NestedEnumTipoVehiculoNullableFilter<$PrismaModel = never> = {
-    equals?: $Enums.TipoVehiculo | EnumTipoVehiculoFieldRefInput<$PrismaModel> | null
-    in?: $Enums.TipoVehiculo[] | ListEnumTipoVehiculoFieldRefInput<$PrismaModel> | null
-    notIn?: $Enums.TipoVehiculo[] | ListEnumTipoVehiculoFieldRefInput<$PrismaModel> | null
-    not?: NestedEnumTipoVehiculoNullableFilter<$PrismaModel> | $Enums.TipoVehiculo | null
-  }
-
   export type NestedEnumTipoRutaWithAggregatesFilter<$PrismaModel = never> = {
     equals?: $Enums.TipoRuta | EnumTipoRutaFieldRefInput<$PrismaModel>
     in?: $Enums.TipoRuta[] | ListEnumTipoRutaFieldRefInput<$PrismaModel>
@@ -58292,16 +58803,6 @@ export namespace Prisma {
     _count?: NestedIntFilter<$PrismaModel>
     _min?: NestedEnumEstadoRutaFilter<$PrismaModel>
     _max?: NestedEnumEstadoRutaFilter<$PrismaModel>
-  }
-
-  export type NestedEnumTipoVehiculoNullableWithAggregatesFilter<$PrismaModel = never> = {
-    equals?: $Enums.TipoVehiculo | EnumTipoVehiculoFieldRefInput<$PrismaModel> | null
-    in?: $Enums.TipoVehiculo[] | ListEnumTipoVehiculoFieldRefInput<$PrismaModel> | null
-    notIn?: $Enums.TipoVehiculo[] | ListEnumTipoVehiculoFieldRefInput<$PrismaModel> | null
-    not?: NestedEnumTipoVehiculoNullableWithAggregatesFilter<$PrismaModel> | $Enums.TipoVehiculo | null
-    _count?: NestedIntNullableFilter<$PrismaModel>
-    _min?: NestedEnumTipoVehiculoNullableFilter<$PrismaModel>
-    _max?: NestedEnumTipoVehiculoNullableFilter<$PrismaModel>
   }
   export type NestedJsonNullableFilter<$PrismaModel = never> =
     | PatchUndefined<
@@ -59645,6 +60146,7 @@ export namespace Prisma {
     tarifasDestino?: tarifas_sucursalesCreateNestedManyWithoutSucursalDestinoInput
     tarifasOrigen?: tarifas_sucursalesCreateNestedManyWithoutSucursalOrigenInput
     usuarios?: usuariosCreateNestedManyWithoutSucursalesInput
+    vehiculos?: vehiculosCreateNestedManyWithoutSucursalInput
     rutasOrigen?: rutasCreateNestedManyWithoutSucursalOrigenInput
     rutasDestino?: rutasCreateNestedManyWithoutSucursalDestinoInput
   }
@@ -59664,6 +60166,7 @@ export namespace Prisma {
     tarifasDestino?: tarifas_sucursalesUncheckedCreateNestedManyWithoutSucursalDestinoInput
     tarifasOrigen?: tarifas_sucursalesUncheckedCreateNestedManyWithoutSucursalOrigenInput
     usuarios?: usuariosUncheckedCreateNestedManyWithoutSucursalesInput
+    vehiculos?: vehiculosUncheckedCreateNestedManyWithoutSucursalInput
     rutasOrigen?: rutasUncheckedCreateNestedManyWithoutSucursalOrigenInput
     rutasDestino?: rutasUncheckedCreateNestedManyWithoutSucursalDestinoInput
   }
@@ -59688,6 +60191,7 @@ export namespace Prisma {
     tarifasDestino?: tarifas_sucursalesCreateNestedManyWithoutSucursalDestinoInput
     tarifasOrigen?: tarifas_sucursalesCreateNestedManyWithoutSucursalOrigenInput
     usuarios?: usuariosCreateNestedManyWithoutSucursalesInput
+    vehiculos?: vehiculosCreateNestedManyWithoutSucursalInput
     rutasOrigen?: rutasCreateNestedManyWithoutSucursalOrigenInput
     rutasDestino?: rutasCreateNestedManyWithoutSucursalDestinoInput
   }
@@ -59707,6 +60211,7 @@ export namespace Prisma {
     tarifasDestino?: tarifas_sucursalesUncheckedCreateNestedManyWithoutSucursalDestinoInput
     tarifasOrigen?: tarifas_sucursalesUncheckedCreateNestedManyWithoutSucursalOrigenInput
     usuarios?: usuariosUncheckedCreateNestedManyWithoutSucursalesInput
+    vehiculos?: vehiculosUncheckedCreateNestedManyWithoutSucursalInput
     rutasOrigen?: rutasUncheckedCreateNestedManyWithoutSucursalOrigenInput
     rutasDestino?: rutasUncheckedCreateNestedManyWithoutSucursalDestinoInput
   }
@@ -59768,22 +60273,42 @@ export namespace Prisma {
   }
 
   export type vehiculosCreateWithoutEnviosInput = {
-    id: string
+    id?: string
     placa: string
+    marca?: string | null
     modelo?: string | null
+    año?: number | null
     capacidad?: number | null
+    pesoMaximo: number
+    volumenMaximo?: number | null
+    tipoVehiculo?: $Enums.TipoVehiculo | null
+    estado?: $Enums.EstadoVehiculo
+    soat?: Date | string | null
+    revision?: Date | string | null
+    observaciones?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
     deletedAt?: Date | string | null
     usuarios?: usuariosCreateNestedOneWithoutVehiculosInput
+    sucursal?: sucursalesCreateNestedOneWithoutVehiculosInput
   }
 
   export type vehiculosUncheckedCreateWithoutEnviosInput = {
-    id: string
+    id?: string
     placa: string
+    marca?: string | null
     modelo?: string | null
+    año?: number | null
     capacidad?: number | null
+    pesoMaximo: number
+    volumenMaximo?: number | null
+    tipoVehiculo?: $Enums.TipoVehiculo | null
+    estado?: $Enums.EstadoVehiculo
+    sucursalId?: string | null
     conductorId?: string | null
+    soat?: Date | string | null
+    revision?: Date | string | null
+    observaciones?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
     deletedAt?: Date | string | null
@@ -60191,6 +60716,7 @@ export namespace Prisma {
     tarifasDestino?: tarifas_sucursalesUpdateManyWithoutSucursalDestinoNestedInput
     tarifasOrigen?: tarifas_sucursalesUpdateManyWithoutSucursalOrigenNestedInput
     usuarios?: usuariosUpdateManyWithoutSucursalesNestedInput
+    vehiculos?: vehiculosUpdateManyWithoutSucursalNestedInput
     rutasOrigen?: rutasUpdateManyWithoutSucursalOrigenNestedInput
     rutasDestino?: rutasUpdateManyWithoutSucursalDestinoNestedInput
   }
@@ -60210,6 +60736,7 @@ export namespace Prisma {
     tarifasDestino?: tarifas_sucursalesUncheckedUpdateManyWithoutSucursalDestinoNestedInput
     tarifasOrigen?: tarifas_sucursalesUncheckedUpdateManyWithoutSucursalOrigenNestedInput
     usuarios?: usuariosUncheckedUpdateManyWithoutSucursalesNestedInput
+    vehiculos?: vehiculosUncheckedUpdateManyWithoutSucursalNestedInput
     rutasOrigen?: rutasUncheckedUpdateManyWithoutSucursalOrigenNestedInput
     rutasDestino?: rutasUncheckedUpdateManyWithoutSucursalDestinoNestedInput
   }
@@ -60240,6 +60767,7 @@ export namespace Prisma {
     tarifasDestino?: tarifas_sucursalesUpdateManyWithoutSucursalDestinoNestedInput
     tarifasOrigen?: tarifas_sucursalesUpdateManyWithoutSucursalOrigenNestedInput
     usuarios?: usuariosUpdateManyWithoutSucursalesNestedInput
+    vehiculos?: vehiculosUpdateManyWithoutSucursalNestedInput
     rutasOrigen?: rutasUpdateManyWithoutSucursalOrigenNestedInput
     rutasDestino?: rutasUpdateManyWithoutSucursalDestinoNestedInput
   }
@@ -60259,6 +60787,7 @@ export namespace Prisma {
     tarifasDestino?: tarifas_sucursalesUncheckedUpdateManyWithoutSucursalDestinoNestedInput
     tarifasOrigen?: tarifas_sucursalesUncheckedUpdateManyWithoutSucursalOrigenNestedInput
     usuarios?: usuariosUncheckedUpdateManyWithoutSucursalesNestedInput
+    vehiculos?: vehiculosUncheckedUpdateManyWithoutSucursalNestedInput
     rutasOrigen?: rutasUncheckedUpdateManyWithoutSucursalOrigenNestedInput
     rutasDestino?: rutasUncheckedUpdateManyWithoutSucursalDestinoNestedInput
   }
@@ -60334,20 +60863,40 @@ export namespace Prisma {
   export type vehiculosUpdateWithoutEnviosInput = {
     id?: StringFieldUpdateOperationsInput | string
     placa?: StringFieldUpdateOperationsInput | string
+    marca?: NullableStringFieldUpdateOperationsInput | string | null
     modelo?: NullableStringFieldUpdateOperationsInput | string | null
+    año?: NullableIntFieldUpdateOperationsInput | number | null
     capacidad?: NullableFloatFieldUpdateOperationsInput | number | null
+    pesoMaximo?: FloatFieldUpdateOperationsInput | number
+    volumenMaximo?: NullableFloatFieldUpdateOperationsInput | number | null
+    tipoVehiculo?: NullableEnumTipoVehiculoFieldUpdateOperationsInput | $Enums.TipoVehiculo | null
+    estado?: EnumEstadoVehiculoFieldUpdateOperationsInput | $Enums.EstadoVehiculo
+    soat?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    revision?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    observaciones?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     deletedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     usuarios?: usuariosUpdateOneWithoutVehiculosNestedInput
+    sucursal?: sucursalesUpdateOneWithoutVehiculosNestedInput
   }
 
   export type vehiculosUncheckedUpdateWithoutEnviosInput = {
     id?: StringFieldUpdateOperationsInput | string
     placa?: StringFieldUpdateOperationsInput | string
+    marca?: NullableStringFieldUpdateOperationsInput | string | null
     modelo?: NullableStringFieldUpdateOperationsInput | string | null
+    año?: NullableIntFieldUpdateOperationsInput | number | null
     capacidad?: NullableFloatFieldUpdateOperationsInput | number | null
+    pesoMaximo?: FloatFieldUpdateOperationsInput | number
+    volumenMaximo?: NullableFloatFieldUpdateOperationsInput | number | null
+    tipoVehiculo?: NullableEnumTipoVehiculoFieldUpdateOperationsInput | $Enums.TipoVehiculo | null
+    estado?: EnumEstadoVehiculoFieldUpdateOperationsInput | $Enums.EstadoVehiculo
+    sucursalId?: NullableStringFieldUpdateOperationsInput | string | null
     conductorId?: NullableStringFieldUpdateOperationsInput | string | null
+    soat?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    revision?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    observaciones?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     deletedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -61852,6 +62401,58 @@ export namespace Prisma {
     skipDuplicates?: boolean
   }
 
+  export type vehiculosCreateWithoutSucursalInput = {
+    id?: string
+    placa: string
+    marca?: string | null
+    modelo?: string | null
+    año?: number | null
+    capacidad?: number | null
+    pesoMaximo: number
+    volumenMaximo?: number | null
+    tipoVehiculo?: $Enums.TipoVehiculo | null
+    estado?: $Enums.EstadoVehiculo
+    soat?: Date | string | null
+    revision?: Date | string | null
+    observaciones?: string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    deletedAt?: Date | string | null
+    envios?: enviosCreateNestedManyWithoutVehiculoInput
+    usuarios?: usuariosCreateNestedOneWithoutVehiculosInput
+  }
+
+  export type vehiculosUncheckedCreateWithoutSucursalInput = {
+    id?: string
+    placa: string
+    marca?: string | null
+    modelo?: string | null
+    año?: number | null
+    capacidad?: number | null
+    pesoMaximo: number
+    volumenMaximo?: number | null
+    tipoVehiculo?: $Enums.TipoVehiculo | null
+    estado?: $Enums.EstadoVehiculo
+    conductorId?: string | null
+    soat?: Date | string | null
+    revision?: Date | string | null
+    observaciones?: string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    deletedAt?: Date | string | null
+    envios?: enviosUncheckedCreateNestedManyWithoutVehiculoInput
+  }
+
+  export type vehiculosCreateOrConnectWithoutSucursalInput = {
+    where: vehiculosWhereUniqueInput
+    create: XOR<vehiculosCreateWithoutSucursalInput, vehiculosUncheckedCreateWithoutSucursalInput>
+  }
+
+  export type vehiculosCreateManySucursalInputEnvelope = {
+    data: vehiculosCreateManySucursalInput | vehiculosCreateManySucursalInput[]
+    skipDuplicates?: boolean
+  }
+
   export type rutasCreateWithoutSucursalOrigenInput = {
     id?: string
     nombre: string
@@ -62115,6 +62716,46 @@ export namespace Prisma {
     phone?: StringNullableFilter<"usuarios"> | string | null
     role?: EnumRolFilter<"usuarios"> | $Enums.Rol
     deletedAt?: DateTimeNullableFilter<"usuarios"> | Date | string | null
+  }
+
+  export type vehiculosUpsertWithWhereUniqueWithoutSucursalInput = {
+    where: vehiculosWhereUniqueInput
+    update: XOR<vehiculosUpdateWithoutSucursalInput, vehiculosUncheckedUpdateWithoutSucursalInput>
+    create: XOR<vehiculosCreateWithoutSucursalInput, vehiculosUncheckedCreateWithoutSucursalInput>
+  }
+
+  export type vehiculosUpdateWithWhereUniqueWithoutSucursalInput = {
+    where: vehiculosWhereUniqueInput
+    data: XOR<vehiculosUpdateWithoutSucursalInput, vehiculosUncheckedUpdateWithoutSucursalInput>
+  }
+
+  export type vehiculosUpdateManyWithWhereWithoutSucursalInput = {
+    where: vehiculosScalarWhereInput
+    data: XOR<vehiculosUpdateManyMutationInput, vehiculosUncheckedUpdateManyWithoutSucursalInput>
+  }
+
+  export type vehiculosScalarWhereInput = {
+    AND?: vehiculosScalarWhereInput | vehiculosScalarWhereInput[]
+    OR?: vehiculosScalarWhereInput[]
+    NOT?: vehiculosScalarWhereInput | vehiculosScalarWhereInput[]
+    id?: StringFilter<"vehiculos"> | string
+    placa?: StringFilter<"vehiculos"> | string
+    marca?: StringNullableFilter<"vehiculos"> | string | null
+    modelo?: StringNullableFilter<"vehiculos"> | string | null
+    año?: IntNullableFilter<"vehiculos"> | number | null
+    capacidad?: FloatNullableFilter<"vehiculos"> | number | null
+    pesoMaximo?: FloatFilter<"vehiculos"> | number
+    volumenMaximo?: FloatNullableFilter<"vehiculos"> | number | null
+    tipoVehiculo?: EnumTipoVehiculoNullableFilter<"vehiculos"> | $Enums.TipoVehiculo | null
+    estado?: EnumEstadoVehiculoFilter<"vehiculos"> | $Enums.EstadoVehiculo
+    sucursalId?: StringNullableFilter<"vehiculos"> | string | null
+    conductorId?: StringNullableFilter<"vehiculos"> | string | null
+    soat?: DateTimeNullableFilter<"vehiculos"> | Date | string | null
+    revision?: DateTimeNullableFilter<"vehiculos"> | Date | string | null
+    observaciones?: StringNullableFilter<"vehiculos"> | string | null
+    createdAt?: DateTimeFilter<"vehiculos"> | Date | string
+    updatedAt?: DateTimeFilter<"vehiculos"> | Date | string
+    deletedAt?: DateTimeNullableFilter<"vehiculos"> | Date | string | null
   }
 
   export type rutasUpsertWithWhereUniqueWithoutSucursalOrigenInput = {
@@ -62557,6 +63198,7 @@ export namespace Prisma {
     cotizacionesOrigen?: cotizacionesCreateNestedManyWithoutSucursalOrigenInput
     tarifasOrigen?: tarifas_sucursalesCreateNestedManyWithoutSucursalOrigenInput
     usuarios?: usuariosCreateNestedManyWithoutSucursalesInput
+    vehiculos?: vehiculosCreateNestedManyWithoutSucursalInput
     rutasOrigen?: rutasCreateNestedManyWithoutSucursalOrigenInput
     rutasDestino?: rutasCreateNestedManyWithoutSucursalDestinoInput
   }
@@ -62576,6 +63218,7 @@ export namespace Prisma {
     cotizacionesOrigen?: cotizacionesUncheckedCreateNestedManyWithoutSucursalOrigenInput
     tarifasOrigen?: tarifas_sucursalesUncheckedCreateNestedManyWithoutSucursalOrigenInput
     usuarios?: usuariosUncheckedCreateNestedManyWithoutSucursalesInput
+    vehiculos?: vehiculosUncheckedCreateNestedManyWithoutSucursalInput
     rutasOrigen?: rutasUncheckedCreateNestedManyWithoutSucursalOrigenInput
     rutasDestino?: rutasUncheckedCreateNestedManyWithoutSucursalDestinoInput
   }
@@ -62600,6 +63243,7 @@ export namespace Prisma {
     cotizacionesOrigen?: cotizacionesCreateNestedManyWithoutSucursalOrigenInput
     tarifasDestino?: tarifas_sucursalesCreateNestedManyWithoutSucursalDestinoInput
     usuarios?: usuariosCreateNestedManyWithoutSucursalesInput
+    vehiculos?: vehiculosCreateNestedManyWithoutSucursalInput
     rutasOrigen?: rutasCreateNestedManyWithoutSucursalOrigenInput
     rutasDestino?: rutasCreateNestedManyWithoutSucursalDestinoInput
   }
@@ -62619,6 +63263,7 @@ export namespace Prisma {
     cotizacionesOrigen?: cotizacionesUncheckedCreateNestedManyWithoutSucursalOrigenInput
     tarifasDestino?: tarifas_sucursalesUncheckedCreateNestedManyWithoutSucursalDestinoInput
     usuarios?: usuariosUncheckedCreateNestedManyWithoutSucursalesInput
+    vehiculos?: vehiculosUncheckedCreateNestedManyWithoutSucursalInput
     rutasOrigen?: rutasUncheckedCreateNestedManyWithoutSucursalOrigenInput
     rutasDestino?: rutasUncheckedCreateNestedManyWithoutSucursalDestinoInput
   }
@@ -62670,6 +63315,7 @@ export namespace Prisma {
     cotizacionesOrigen?: cotizacionesUpdateManyWithoutSucursalOrigenNestedInput
     tarifasOrigen?: tarifas_sucursalesUpdateManyWithoutSucursalOrigenNestedInput
     usuarios?: usuariosUpdateManyWithoutSucursalesNestedInput
+    vehiculos?: vehiculosUpdateManyWithoutSucursalNestedInput
     rutasOrigen?: rutasUpdateManyWithoutSucursalOrigenNestedInput
     rutasDestino?: rutasUpdateManyWithoutSucursalDestinoNestedInput
   }
@@ -62689,6 +63335,7 @@ export namespace Prisma {
     cotizacionesOrigen?: cotizacionesUncheckedUpdateManyWithoutSucursalOrigenNestedInput
     tarifasOrigen?: tarifas_sucursalesUncheckedUpdateManyWithoutSucursalOrigenNestedInput
     usuarios?: usuariosUncheckedUpdateManyWithoutSucursalesNestedInput
+    vehiculos?: vehiculosUncheckedUpdateManyWithoutSucursalNestedInput
     rutasOrigen?: rutasUncheckedUpdateManyWithoutSucursalOrigenNestedInput
     rutasDestino?: rutasUncheckedUpdateManyWithoutSucursalDestinoNestedInput
   }
@@ -62719,6 +63366,7 @@ export namespace Prisma {
     cotizacionesOrigen?: cotizacionesUpdateManyWithoutSucursalOrigenNestedInput
     tarifasDestino?: tarifas_sucursalesUpdateManyWithoutSucursalDestinoNestedInput
     usuarios?: usuariosUpdateManyWithoutSucursalesNestedInput
+    vehiculos?: vehiculosUpdateManyWithoutSucursalNestedInput
     rutasOrigen?: rutasUpdateManyWithoutSucursalOrigenNestedInput
     rutasDestino?: rutasUpdateManyWithoutSucursalDestinoNestedInput
   }
@@ -62738,6 +63386,7 @@ export namespace Prisma {
     cotizacionesOrigen?: cotizacionesUncheckedUpdateManyWithoutSucursalOrigenNestedInput
     tarifasDestino?: tarifas_sucursalesUncheckedUpdateManyWithoutSucursalDestinoNestedInput
     usuarios?: usuariosUncheckedUpdateManyWithoutSucursalesNestedInput
+    vehiculos?: vehiculosUncheckedUpdateManyWithoutSucursalNestedInput
     rutasOrigen?: rutasUncheckedUpdateManyWithoutSucursalOrigenNestedInput
     rutasDestino?: rutasUncheckedUpdateManyWithoutSucursalDestinoNestedInput
   }
@@ -62993,6 +63642,7 @@ export namespace Prisma {
     cotizacionesOrigen?: cotizacionesCreateNestedManyWithoutSucursalOrigenInput
     tarifasDestino?: tarifas_sucursalesCreateNestedManyWithoutSucursalDestinoInput
     tarifasOrigen?: tarifas_sucursalesCreateNestedManyWithoutSucursalOrigenInput
+    vehiculos?: vehiculosCreateNestedManyWithoutSucursalInput
     rutasOrigen?: rutasCreateNestedManyWithoutSucursalOrigenInput
     rutasDestino?: rutasCreateNestedManyWithoutSucursalDestinoInput
   }
@@ -63012,6 +63662,7 @@ export namespace Prisma {
     cotizacionesOrigen?: cotizacionesUncheckedCreateNestedManyWithoutSucursalOrigenInput
     tarifasDestino?: tarifas_sucursalesUncheckedCreateNestedManyWithoutSucursalDestinoInput
     tarifasOrigen?: tarifas_sucursalesUncheckedCreateNestedManyWithoutSucursalOrigenInput
+    vehiculos?: vehiculosUncheckedCreateNestedManyWithoutSucursalInput
     rutasOrigen?: rutasUncheckedCreateNestedManyWithoutSucursalOrigenInput
     rutasDestino?: rutasUncheckedCreateNestedManyWithoutSucursalDestinoInput
   }
@@ -63022,21 +63673,41 @@ export namespace Prisma {
   }
 
   export type vehiculosCreateWithoutUsuariosInput = {
-    id: string
+    id?: string
     placa: string
+    marca?: string | null
     modelo?: string | null
+    año?: number | null
     capacidad?: number | null
+    pesoMaximo: number
+    volumenMaximo?: number | null
+    tipoVehiculo?: $Enums.TipoVehiculo | null
+    estado?: $Enums.EstadoVehiculo
+    soat?: Date | string | null
+    revision?: Date | string | null
+    observaciones?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
     deletedAt?: Date | string | null
     envios?: enviosCreateNestedManyWithoutVehiculoInput
+    sucursal?: sucursalesCreateNestedOneWithoutVehiculosInput
   }
 
   export type vehiculosUncheckedCreateWithoutUsuariosInput = {
-    id: string
+    id?: string
     placa: string
+    marca?: string | null
     modelo?: string | null
+    año?: number | null
     capacidad?: number | null
+    pesoMaximo: number
+    volumenMaximo?: number | null
+    tipoVehiculo?: $Enums.TipoVehiculo | null
+    estado?: $Enums.EstadoVehiculo
+    sucursalId?: string | null
+    soat?: Date | string | null
+    revision?: Date | string | null
+    observaciones?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
     deletedAt?: Date | string | null
@@ -63426,6 +64097,7 @@ export namespace Prisma {
     cotizacionesOrigen?: cotizacionesUpdateManyWithoutSucursalOrigenNestedInput
     tarifasDestino?: tarifas_sucursalesUpdateManyWithoutSucursalDestinoNestedInput
     tarifasOrigen?: tarifas_sucursalesUpdateManyWithoutSucursalOrigenNestedInput
+    vehiculos?: vehiculosUpdateManyWithoutSucursalNestedInput
     rutasOrigen?: rutasUpdateManyWithoutSucursalOrigenNestedInput
     rutasDestino?: rutasUpdateManyWithoutSucursalDestinoNestedInput
   }
@@ -63445,6 +64117,7 @@ export namespace Prisma {
     cotizacionesOrigen?: cotizacionesUncheckedUpdateManyWithoutSucursalOrigenNestedInput
     tarifasDestino?: tarifas_sucursalesUncheckedUpdateManyWithoutSucursalDestinoNestedInput
     tarifasOrigen?: tarifas_sucursalesUncheckedUpdateManyWithoutSucursalOrigenNestedInput
+    vehiculos?: vehiculosUncheckedUpdateManyWithoutSucursalNestedInput
     rutasOrigen?: rutasUncheckedUpdateManyWithoutSucursalOrigenNestedInput
     rutasDestino?: rutasUncheckedUpdateManyWithoutSucursalDestinoNestedInput
   }
@@ -63463,19 +64136,39 @@ export namespace Prisma {
   export type vehiculosUpdateWithoutUsuariosInput = {
     id?: StringFieldUpdateOperationsInput | string
     placa?: StringFieldUpdateOperationsInput | string
+    marca?: NullableStringFieldUpdateOperationsInput | string | null
     modelo?: NullableStringFieldUpdateOperationsInput | string | null
+    año?: NullableIntFieldUpdateOperationsInput | number | null
     capacidad?: NullableFloatFieldUpdateOperationsInput | number | null
+    pesoMaximo?: FloatFieldUpdateOperationsInput | number
+    volumenMaximo?: NullableFloatFieldUpdateOperationsInput | number | null
+    tipoVehiculo?: NullableEnumTipoVehiculoFieldUpdateOperationsInput | $Enums.TipoVehiculo | null
+    estado?: EnumEstadoVehiculoFieldUpdateOperationsInput | $Enums.EstadoVehiculo
+    soat?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    revision?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    observaciones?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     deletedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     envios?: enviosUpdateManyWithoutVehiculoNestedInput
+    sucursal?: sucursalesUpdateOneWithoutVehiculosNestedInput
   }
 
   export type vehiculosUncheckedUpdateWithoutUsuariosInput = {
     id?: StringFieldUpdateOperationsInput | string
     placa?: StringFieldUpdateOperationsInput | string
+    marca?: NullableStringFieldUpdateOperationsInput | string | null
     modelo?: NullableStringFieldUpdateOperationsInput | string | null
+    año?: NullableIntFieldUpdateOperationsInput | number | null
     capacidad?: NullableFloatFieldUpdateOperationsInput | number | null
+    pesoMaximo?: FloatFieldUpdateOperationsInput | number
+    volumenMaximo?: NullableFloatFieldUpdateOperationsInput | number | null
+    tipoVehiculo?: NullableEnumTipoVehiculoFieldUpdateOperationsInput | $Enums.TipoVehiculo | null
+    estado?: EnumEstadoVehiculoFieldUpdateOperationsInput | $Enums.EstadoVehiculo
+    sucursalId?: NullableStringFieldUpdateOperationsInput | string | null
+    soat?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    revision?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    observaciones?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     deletedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -63854,6 +64547,51 @@ export namespace Prisma {
     create: XOR<usuariosCreateWithoutVehiculosInput, usuariosUncheckedCreateWithoutVehiculosInput>
   }
 
+  export type sucursalesCreateWithoutVehiculosInput = {
+    id: string
+    nombre: string
+    direccion: string
+    provincia: string
+    telefono?: string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    deletedAt?: Date | string | null
+    enviosOrigen?: enviosCreateNestedManyWithoutSucursalOrigenInput
+    enviosDestino?: enviosCreateNestedManyWithoutSucursalDestinoInput
+    cotizacionesDestino?: cotizacionesCreateNestedManyWithoutSucursalDestinoInput
+    cotizacionesOrigen?: cotizacionesCreateNestedManyWithoutSucursalOrigenInput
+    tarifasDestino?: tarifas_sucursalesCreateNestedManyWithoutSucursalDestinoInput
+    tarifasOrigen?: tarifas_sucursalesCreateNestedManyWithoutSucursalOrigenInput
+    usuarios?: usuariosCreateNestedManyWithoutSucursalesInput
+    rutasOrigen?: rutasCreateNestedManyWithoutSucursalOrigenInput
+    rutasDestino?: rutasCreateNestedManyWithoutSucursalDestinoInput
+  }
+
+  export type sucursalesUncheckedCreateWithoutVehiculosInput = {
+    id: string
+    nombre: string
+    direccion: string
+    provincia: string
+    telefono?: string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    deletedAt?: Date | string | null
+    enviosOrigen?: enviosUncheckedCreateNestedManyWithoutSucursalOrigenInput
+    enviosDestino?: enviosUncheckedCreateNestedManyWithoutSucursalDestinoInput
+    cotizacionesDestino?: cotizacionesUncheckedCreateNestedManyWithoutSucursalDestinoInput
+    cotizacionesOrigen?: cotizacionesUncheckedCreateNestedManyWithoutSucursalOrigenInput
+    tarifasDestino?: tarifas_sucursalesUncheckedCreateNestedManyWithoutSucursalDestinoInput
+    tarifasOrigen?: tarifas_sucursalesUncheckedCreateNestedManyWithoutSucursalOrigenInput
+    usuarios?: usuariosUncheckedCreateNestedManyWithoutSucursalesInput
+    rutasOrigen?: rutasUncheckedCreateNestedManyWithoutSucursalOrigenInput
+    rutasDestino?: rutasUncheckedCreateNestedManyWithoutSucursalDestinoInput
+  }
+
+  export type sucursalesCreateOrConnectWithoutVehiculosInput = {
+    where: sucursalesWhereUniqueInput
+    create: XOR<sucursalesCreateWithoutVehiculosInput, sucursalesUncheckedCreateWithoutVehiculosInput>
+  }
+
   export type enviosUpsertWithWhereUniqueWithoutVehiculoInput = {
     where: enviosWhereUniqueInput
     update: XOR<enviosUpdateWithoutVehiculoInput, enviosUncheckedUpdateWithoutVehiculoInput>
@@ -63925,6 +64663,57 @@ export namespace Prisma {
     respaldos?: respaldosUncheckedUpdateManyWithoutUsuarioNestedInput
     restauraciones?: restauracionesUncheckedUpdateManyWithoutUsuarioNestedInput
     auditoria_respaldos?: auditoria_respaldosUncheckedUpdateManyWithoutUsuarioNestedInput
+  }
+
+  export type sucursalesUpsertWithoutVehiculosInput = {
+    update: XOR<sucursalesUpdateWithoutVehiculosInput, sucursalesUncheckedUpdateWithoutVehiculosInput>
+    create: XOR<sucursalesCreateWithoutVehiculosInput, sucursalesUncheckedCreateWithoutVehiculosInput>
+    where?: sucursalesWhereInput
+  }
+
+  export type sucursalesUpdateToOneWithWhereWithoutVehiculosInput = {
+    where?: sucursalesWhereInput
+    data: XOR<sucursalesUpdateWithoutVehiculosInput, sucursalesUncheckedUpdateWithoutVehiculosInput>
+  }
+
+  export type sucursalesUpdateWithoutVehiculosInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    nombre?: StringFieldUpdateOperationsInput | string
+    direccion?: StringFieldUpdateOperationsInput | string
+    provincia?: StringFieldUpdateOperationsInput | string
+    telefono?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    deletedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    enviosOrigen?: enviosUpdateManyWithoutSucursalOrigenNestedInput
+    enviosDestino?: enviosUpdateManyWithoutSucursalDestinoNestedInput
+    cotizacionesDestino?: cotizacionesUpdateManyWithoutSucursalDestinoNestedInput
+    cotizacionesOrigen?: cotizacionesUpdateManyWithoutSucursalOrigenNestedInput
+    tarifasDestino?: tarifas_sucursalesUpdateManyWithoutSucursalDestinoNestedInput
+    tarifasOrigen?: tarifas_sucursalesUpdateManyWithoutSucursalOrigenNestedInput
+    usuarios?: usuariosUpdateManyWithoutSucursalesNestedInput
+    rutasOrigen?: rutasUpdateManyWithoutSucursalOrigenNestedInput
+    rutasDestino?: rutasUpdateManyWithoutSucursalDestinoNestedInput
+  }
+
+  export type sucursalesUncheckedUpdateWithoutVehiculosInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    nombre?: StringFieldUpdateOperationsInput | string
+    direccion?: StringFieldUpdateOperationsInput | string
+    provincia?: StringFieldUpdateOperationsInput | string
+    telefono?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    deletedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    enviosOrigen?: enviosUncheckedUpdateManyWithoutSucursalOrigenNestedInput
+    enviosDestino?: enviosUncheckedUpdateManyWithoutSucursalDestinoNestedInput
+    cotizacionesDestino?: cotizacionesUncheckedUpdateManyWithoutSucursalDestinoNestedInput
+    cotizacionesOrigen?: cotizacionesUncheckedUpdateManyWithoutSucursalOrigenNestedInput
+    tarifasDestino?: tarifas_sucursalesUncheckedUpdateManyWithoutSucursalDestinoNestedInput
+    tarifasOrigen?: tarifas_sucursalesUncheckedUpdateManyWithoutSucursalOrigenNestedInput
+    usuarios?: usuariosUncheckedUpdateManyWithoutSucursalesNestedInput
+    rutasOrigen?: rutasUncheckedUpdateManyWithoutSucursalOrigenNestedInput
+    rutasDestino?: rutasUncheckedUpdateManyWithoutSucursalDestinoNestedInput
   }
 
   export type usuario_permisosCreateWithoutPermisoInput = {
@@ -64764,6 +65553,7 @@ export namespace Prisma {
     tarifasDestino?: tarifas_sucursalesCreateNestedManyWithoutSucursalDestinoInput
     tarifasOrigen?: tarifas_sucursalesCreateNestedManyWithoutSucursalOrigenInput
     usuarios?: usuariosCreateNestedManyWithoutSucursalesInput
+    vehiculos?: vehiculosCreateNestedManyWithoutSucursalInput
     rutasOrigen?: rutasCreateNestedManyWithoutSucursalOrigenInput
     rutasDestino?: rutasCreateNestedManyWithoutSucursalDestinoInput
   }
@@ -64783,6 +65573,7 @@ export namespace Prisma {
     tarifasDestino?: tarifas_sucursalesUncheckedCreateNestedManyWithoutSucursalDestinoInput
     tarifasOrigen?: tarifas_sucursalesUncheckedCreateNestedManyWithoutSucursalOrigenInput
     usuarios?: usuariosUncheckedCreateNestedManyWithoutSucursalesInput
+    vehiculos?: vehiculosUncheckedCreateNestedManyWithoutSucursalInput
     rutasOrigen?: rutasUncheckedCreateNestedManyWithoutSucursalOrigenInput
     rutasDestino?: rutasUncheckedCreateNestedManyWithoutSucursalDestinoInput
   }
@@ -64807,6 +65598,7 @@ export namespace Prisma {
     tarifasDestino?: tarifas_sucursalesCreateNestedManyWithoutSucursalDestinoInput
     tarifasOrigen?: tarifas_sucursalesCreateNestedManyWithoutSucursalOrigenInput
     usuarios?: usuariosCreateNestedManyWithoutSucursalesInput
+    vehiculos?: vehiculosCreateNestedManyWithoutSucursalInput
     rutasOrigen?: rutasCreateNestedManyWithoutSucursalOrigenInput
     rutasDestino?: rutasCreateNestedManyWithoutSucursalDestinoInput
   }
@@ -64826,6 +65618,7 @@ export namespace Prisma {
     tarifasDestino?: tarifas_sucursalesUncheckedCreateNestedManyWithoutSucursalDestinoInput
     tarifasOrigen?: tarifas_sucursalesUncheckedCreateNestedManyWithoutSucursalOrigenInput
     usuarios?: usuariosUncheckedCreateNestedManyWithoutSucursalesInput
+    vehiculos?: vehiculosUncheckedCreateNestedManyWithoutSucursalInput
     rutasOrigen?: rutasUncheckedCreateNestedManyWithoutSucursalOrigenInput
     rutasDestino?: rutasUncheckedCreateNestedManyWithoutSucursalDestinoInput
   }
@@ -64980,6 +65773,7 @@ export namespace Prisma {
     tarifasDestino?: tarifas_sucursalesUpdateManyWithoutSucursalDestinoNestedInput
     tarifasOrigen?: tarifas_sucursalesUpdateManyWithoutSucursalOrigenNestedInput
     usuarios?: usuariosUpdateManyWithoutSucursalesNestedInput
+    vehiculos?: vehiculosUpdateManyWithoutSucursalNestedInput
     rutasOrigen?: rutasUpdateManyWithoutSucursalOrigenNestedInput
     rutasDestino?: rutasUpdateManyWithoutSucursalDestinoNestedInput
   }
@@ -64999,6 +65793,7 @@ export namespace Prisma {
     tarifasDestino?: tarifas_sucursalesUncheckedUpdateManyWithoutSucursalDestinoNestedInput
     tarifasOrigen?: tarifas_sucursalesUncheckedUpdateManyWithoutSucursalOrigenNestedInput
     usuarios?: usuariosUncheckedUpdateManyWithoutSucursalesNestedInput
+    vehiculos?: vehiculosUncheckedUpdateManyWithoutSucursalNestedInput
     rutasOrigen?: rutasUncheckedUpdateManyWithoutSucursalOrigenNestedInput
     rutasDestino?: rutasUncheckedUpdateManyWithoutSucursalDestinoNestedInput
   }
@@ -65029,6 +65824,7 @@ export namespace Prisma {
     tarifasDestino?: tarifas_sucursalesUpdateManyWithoutSucursalDestinoNestedInput
     tarifasOrigen?: tarifas_sucursalesUpdateManyWithoutSucursalOrigenNestedInput
     usuarios?: usuariosUpdateManyWithoutSucursalesNestedInput
+    vehiculos?: vehiculosUpdateManyWithoutSucursalNestedInput
     rutasOrigen?: rutasUpdateManyWithoutSucursalOrigenNestedInput
     rutasDestino?: rutasUpdateManyWithoutSucursalDestinoNestedInput
   }
@@ -65048,6 +65844,7 @@ export namespace Prisma {
     tarifasDestino?: tarifas_sucursalesUncheckedUpdateManyWithoutSucursalDestinoNestedInput
     tarifasOrigen?: tarifas_sucursalesUncheckedUpdateManyWithoutSucursalOrigenNestedInput
     usuarios?: usuariosUncheckedUpdateManyWithoutSucursalesNestedInput
+    vehiculos?: vehiculosUncheckedUpdateManyWithoutSucursalNestedInput
     rutasOrigen?: rutasUncheckedUpdateManyWithoutSucursalOrigenNestedInput
     rutasDestino?: rutasUncheckedUpdateManyWithoutSucursalDestinoNestedInput
   }
@@ -65750,6 +66547,7 @@ export namespace Prisma {
     tarifasDestino?: tarifas_sucursalesCreateNestedManyWithoutSucursalDestinoInput
     tarifasOrigen?: tarifas_sucursalesCreateNestedManyWithoutSucursalOrigenInput
     usuarios?: usuariosCreateNestedManyWithoutSucursalesInput
+    vehiculos?: vehiculosCreateNestedManyWithoutSucursalInput
     rutasDestino?: rutasCreateNestedManyWithoutSucursalDestinoInput
   }
 
@@ -65769,6 +66567,7 @@ export namespace Prisma {
     tarifasDestino?: tarifas_sucursalesUncheckedCreateNestedManyWithoutSucursalDestinoInput
     tarifasOrigen?: tarifas_sucursalesUncheckedCreateNestedManyWithoutSucursalOrigenInput
     usuarios?: usuariosUncheckedCreateNestedManyWithoutSucursalesInput
+    vehiculos?: vehiculosUncheckedCreateNestedManyWithoutSucursalInput
     rutasDestino?: rutasUncheckedCreateNestedManyWithoutSucursalDestinoInput
   }
 
@@ -65793,6 +66592,7 @@ export namespace Prisma {
     tarifasDestino?: tarifas_sucursalesCreateNestedManyWithoutSucursalDestinoInput
     tarifasOrigen?: tarifas_sucursalesCreateNestedManyWithoutSucursalOrigenInput
     usuarios?: usuariosCreateNestedManyWithoutSucursalesInput
+    vehiculos?: vehiculosCreateNestedManyWithoutSucursalInput
     rutasOrigen?: rutasCreateNestedManyWithoutSucursalOrigenInput
   }
 
@@ -65812,6 +66612,7 @@ export namespace Prisma {
     tarifasDestino?: tarifas_sucursalesUncheckedCreateNestedManyWithoutSucursalDestinoInput
     tarifasOrigen?: tarifas_sucursalesUncheckedCreateNestedManyWithoutSucursalOrigenInput
     usuarios?: usuariosUncheckedCreateNestedManyWithoutSucursalesInput
+    vehiculos?: vehiculosUncheckedCreateNestedManyWithoutSucursalInput
     rutasOrigen?: rutasUncheckedCreateNestedManyWithoutSucursalOrigenInput
   }
 
@@ -65847,6 +66648,7 @@ export namespace Prisma {
     tarifasDestino?: tarifas_sucursalesUpdateManyWithoutSucursalDestinoNestedInput
     tarifasOrigen?: tarifas_sucursalesUpdateManyWithoutSucursalOrigenNestedInput
     usuarios?: usuariosUpdateManyWithoutSucursalesNestedInput
+    vehiculos?: vehiculosUpdateManyWithoutSucursalNestedInput
     rutasDestino?: rutasUpdateManyWithoutSucursalDestinoNestedInput
   }
 
@@ -65866,6 +66668,7 @@ export namespace Prisma {
     tarifasDestino?: tarifas_sucursalesUncheckedUpdateManyWithoutSucursalDestinoNestedInput
     tarifasOrigen?: tarifas_sucursalesUncheckedUpdateManyWithoutSucursalOrigenNestedInput
     usuarios?: usuariosUncheckedUpdateManyWithoutSucursalesNestedInput
+    vehiculos?: vehiculosUncheckedUpdateManyWithoutSucursalNestedInput
     rutasDestino?: rutasUncheckedUpdateManyWithoutSucursalDestinoNestedInput
   }
 
@@ -65896,6 +66699,7 @@ export namespace Prisma {
     tarifasDestino?: tarifas_sucursalesUpdateManyWithoutSucursalDestinoNestedInput
     tarifasOrigen?: tarifas_sucursalesUpdateManyWithoutSucursalOrigenNestedInput
     usuarios?: usuariosUpdateManyWithoutSucursalesNestedInput
+    vehiculos?: vehiculosUpdateManyWithoutSucursalNestedInput
     rutasOrigen?: rutasUpdateManyWithoutSucursalOrigenNestedInput
   }
 
@@ -65915,6 +66719,7 @@ export namespace Prisma {
     tarifasDestino?: tarifas_sucursalesUncheckedUpdateManyWithoutSucursalDestinoNestedInput
     tarifasOrigen?: tarifas_sucursalesUncheckedUpdateManyWithoutSucursalOrigenNestedInput
     usuarios?: usuariosUncheckedUpdateManyWithoutSucursalesNestedInput
+    vehiculos?: vehiculosUncheckedUpdateManyWithoutSucursalNestedInput
     rutasOrigen?: rutasUncheckedUpdateManyWithoutSucursalOrigenNestedInput
   }
 
@@ -68417,6 +69222,26 @@ export namespace Prisma {
     deletedAt?: Date | string | null
   }
 
+  export type vehiculosCreateManySucursalInput = {
+    id?: string
+    placa: string
+    marca?: string | null
+    modelo?: string | null
+    año?: number | null
+    capacidad?: number | null
+    pesoMaximo: number
+    volumenMaximo?: number | null
+    tipoVehiculo?: $Enums.TipoVehiculo | null
+    estado?: $Enums.EstadoVehiculo
+    conductorId?: string | null
+    soat?: Date | string | null
+    revision?: Date | string | null
+    observaciones?: string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    deletedAt?: Date | string | null
+  }
+
   export type rutasCreateManySucursalOrigenInput = {
     id?: string
     nombre: string
@@ -69185,6 +70010,68 @@ export namespace Prisma {
     name?: StringFieldUpdateOperationsInput | string
     phone?: NullableStringFieldUpdateOperationsInput | string | null
     role?: EnumRolFieldUpdateOperationsInput | $Enums.Rol
+    deletedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  }
+
+  export type vehiculosUpdateWithoutSucursalInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    placa?: StringFieldUpdateOperationsInput | string
+    marca?: NullableStringFieldUpdateOperationsInput | string | null
+    modelo?: NullableStringFieldUpdateOperationsInput | string | null
+    año?: NullableIntFieldUpdateOperationsInput | number | null
+    capacidad?: NullableFloatFieldUpdateOperationsInput | number | null
+    pesoMaximo?: FloatFieldUpdateOperationsInput | number
+    volumenMaximo?: NullableFloatFieldUpdateOperationsInput | number | null
+    tipoVehiculo?: NullableEnumTipoVehiculoFieldUpdateOperationsInput | $Enums.TipoVehiculo | null
+    estado?: EnumEstadoVehiculoFieldUpdateOperationsInput | $Enums.EstadoVehiculo
+    soat?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    revision?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    observaciones?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    deletedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    envios?: enviosUpdateManyWithoutVehiculoNestedInput
+    usuarios?: usuariosUpdateOneWithoutVehiculosNestedInput
+  }
+
+  export type vehiculosUncheckedUpdateWithoutSucursalInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    placa?: StringFieldUpdateOperationsInput | string
+    marca?: NullableStringFieldUpdateOperationsInput | string | null
+    modelo?: NullableStringFieldUpdateOperationsInput | string | null
+    año?: NullableIntFieldUpdateOperationsInput | number | null
+    capacidad?: NullableFloatFieldUpdateOperationsInput | number | null
+    pesoMaximo?: FloatFieldUpdateOperationsInput | number
+    volumenMaximo?: NullableFloatFieldUpdateOperationsInput | number | null
+    tipoVehiculo?: NullableEnumTipoVehiculoFieldUpdateOperationsInput | $Enums.TipoVehiculo | null
+    estado?: EnumEstadoVehiculoFieldUpdateOperationsInput | $Enums.EstadoVehiculo
+    conductorId?: NullableStringFieldUpdateOperationsInput | string | null
+    soat?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    revision?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    observaciones?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    deletedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    envios?: enviosUncheckedUpdateManyWithoutVehiculoNestedInput
+  }
+
+  export type vehiculosUncheckedUpdateManyWithoutSucursalInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    placa?: StringFieldUpdateOperationsInput | string
+    marca?: NullableStringFieldUpdateOperationsInput | string | null
+    modelo?: NullableStringFieldUpdateOperationsInput | string | null
+    año?: NullableIntFieldUpdateOperationsInput | number | null
+    capacidad?: NullableFloatFieldUpdateOperationsInput | number | null
+    pesoMaximo?: FloatFieldUpdateOperationsInput | number
+    volumenMaximo?: NullableFloatFieldUpdateOperationsInput | number | null
+    tipoVehiculo?: NullableEnumTipoVehiculoFieldUpdateOperationsInput | $Enums.TipoVehiculo | null
+    estado?: EnumEstadoVehiculoFieldUpdateOperationsInput | $Enums.EstadoVehiculo
+    conductorId?: NullableStringFieldUpdateOperationsInput | string | null
+    soat?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    revision?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    observaciones?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     deletedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   }
 

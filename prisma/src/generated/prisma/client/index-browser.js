@@ -340,9 +340,19 @@ exports.Prisma.UsuariosScalarFieldEnum = {
 exports.Prisma.VehiculosScalarFieldEnum = {
   id: 'id',
   placa: 'placa',
+  marca: 'marca',
   modelo: 'modelo',
+  año: 'año',
   capacidad: 'capacidad',
+  pesoMaximo: 'pesoMaximo',
+  volumenMaximo: 'volumenMaximo',
+  tipoVehiculo: 'tipoVehiculo',
+  estado: 'estado',
+  sucursalId: 'sucursalId',
   conductorId: 'conductorId',
+  soat: 'soat',
+  revision: 'revision',
+  observaciones: 'observaciones',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt',
   deletedAt: 'deletedAt'
@@ -785,6 +795,22 @@ exports.Rol = exports.$Enums.Rol = {
   CONTADOR: 'CONTADOR'
 };
 
+exports.TipoVehiculo = exports.$Enums.TipoVehiculo = {
+  CAMION_PEQUENO: 'CAMION_PEQUENO',
+  CAMION_MEDIANO: 'CAMION_MEDIANO',
+  CAMION_GRANDE: 'CAMION_GRANDE',
+  TRAILER: 'TRAILER',
+  FURGONETA: 'FURGONETA',
+  MOTOCICLETA: 'MOTOCICLETA'
+};
+
+exports.EstadoVehiculo = exports.$Enums.EstadoVehiculo = {
+  DISPONIBLE: 'DISPONIBLE',
+  EN_RUTA: 'EN_RUTA',
+  MANTENIMIENTO: 'MANTENIMIENTO',
+  INACTIVO: 'INACTIVO'
+};
+
 exports.EstadoCotizacion = exports.$Enums.EstadoCotizacion = {
   PENDIENTE: 'PENDIENTE',
   APROBADA: 'APROBADA',
@@ -821,15 +847,6 @@ exports.EstadoRuta = exports.$Enums.EstadoRuta = {
   EN_CURSO: 'EN_CURSO',
   COMPLETADA: 'COMPLETADA',
   CANCELADA: 'CANCELADA'
-};
-
-exports.TipoVehiculo = exports.$Enums.TipoVehiculo = {
-  CAMION_PEQUENO: 'CAMION_PEQUENO',
-  CAMION_MEDIANO: 'CAMION_MEDIANO',
-  CAMION_GRANDE: 'CAMION_GRANDE',
-  TRAILER: 'TRAILER',
-  FURGONETA: 'FURGONETA',
-  MOTOCICLETA: 'MOTOCICLETA'
 };
 
 exports.CategoriaLog = exports.$Enums.CategoriaLog = {

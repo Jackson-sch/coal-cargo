@@ -10,7 +10,6 @@ import { formatDateTime } from "@/lib/utils/formatters";
 import { estadosEnvioObject } from "@/lib/constants/estados";
 
 export default function Seguimiento({ envio }) {
-  console.log(envio);
   if (!envio || !envio.eventos || envio.eventos.length === 0) {
     return (
       <Card>

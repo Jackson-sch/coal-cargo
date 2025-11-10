@@ -27,6 +27,7 @@ import {
   crearComprobanteDesdeEnvio,
 } from "@/lib/actions/comprobantes";
 import { toast } from "sonner";
+import { ESTADOS_ENVIO_VALIDOS } from "@/lib/constants/estados";
 
 const ESTADOS_ENVIO = {
   REGISTRADO: {
@@ -37,13 +38,21 @@ const ESTADOS_ENVIO = {
     label: "En Bodega",
     color: "border-transparent bg-yellow-400/20 text-yellow-500",
   },
+  EN_AGENCIA_ORIGEN: {
+    label: "En Agencia Origen",
+    color: "border-transparent bg-blue-400/20 text-blue-500",
+  },
   EN_TRANSITO: {
     label: "En Tránsito",
     color: "border-transparent bg-orange-400/20 text-orange-500",
   },
+  EN_AGENCIA_DESTINO: {
+    label: "En Agencia Destino",
+    color: "border-transparent bg-purple-400/20 text-purple-500",
+  },
   EN_REPARTO: {
     label: "En Reparto",
-    color: "border-transparent bg-purple-400/20 text-purple-500",
+    color: "border-transparent bg-indigo-400/20 text-indigo-500",
   },
   ENTREGADO: {
     label: "Entregado",
@@ -182,11 +191,13 @@ export default function EnviosPendientes({ onComprobanteCreado }) {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="TODOS">Todos los estados</SelectItem>
-                  {Object.entries(ESTADOS_ENVIO).map(([key, estado]) => (
-                    <SelectItem key={key} value={key}>
-                      {estado.label}
-                    </SelectItem>
-                  ))}
+                  {Object.entries(ESTADOS_ENVIO)
+                    .filter(([key]) => ESTADOS_ENVIO_VALIDOS.includes(key))
+                    .map(([key, estado]) => (
+                      <SelectItem key={key} value={key}>
+                        {estado.label}
+                      </SelectItem>
+                    ))}
                 </SelectContent>
               </Select>
             </div>

@@ -32,7 +32,10 @@ import {
   Unlock,
 } from "lucide-react";
 import { useRespaldos } from "@/hooks/use-respaldos";
+import { useErrorHandler } from "@/hooks/useErrorHandler";
+import { obtenerHistorialRespaldos } from "@/lib/actions/respaldos";
 import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
 import {
   Card,
   CardContent,
@@ -73,25 +76,33 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import RouteProtection from "@/components/auth/route-protection";
+
 export default function RespaldoPage() {
+  return (
+    <RouteProtection
+      allowedRoles="SUPER_ADMIN"
+      customMessage="Solo los Super Administradores pueden gestionar respaldos del sistema."
+    >
+      <RespaldoPageContent />
+    </RouteProtection>
+  );
+}
+
+function RespaldoPageContent() {
   const {
-    estadisticas,
-    historial,
-    configuracion,
     loading,
-    error,
-    pagination,
     crearRespaldo,
-    restaurarRespaldo,
-    eliminarRespaldo,
-    actualizarConfiguracion,
-    cargarHistorial,
+    historial,
+    estadisticas,
     refrescar,
     formatBytes,
     formatDuration,
-    getStatusColor,
     getStatusBadgeColor,
+    eliminarRespaldo,
+    restaurarRespaldo,
   } = useRespaldos();
+  const { handleError } = useErrorHandler();
   const [localLoading, setLocalLoading] = useState(false);
   const [selectedBackup, setSelectedBackup] = useState(null);
   const [isRestoreDialogOpen, setIsRestoreDialogOpen] = useState(false);
@@ -112,73 +123,25 @@ export default function RespaldoPage() {
       email: "admin@coalcargo.pe",
     },
   });
-  const [backupHistory, setBackupHistory] = useState([
-    {
-      id: "backup_20240115_020000",
-      name: "Respaldo Automático Diario",
-      type: "automatic",
-      status: "completed",
-      size: "2.4 GB",
-      duration: "12 min",
-      createdAt: "2024-01-15 02:00:00",
-      location: "local+cloud",
-      encrypted: true,
-      tables: ["users", "shipments", "invoices", "customers", "routes"],
-      checksum: "sha256:a1b2c3d4e5f6...",
-    },
-    {
-      id: "backup_20240114_020000",
-      name: "Respaldo Automático Diario",
-      type: "automatic",
-      status: "completed",
-      size: "2.3 GB",
-      duration: "11 min",
-      createdAt: "2024-01-14 02:00:00",
-      location: "local+cloud",
-      encrypted: true,
-      tables: ["users", "shipments", "invoices", "customers", "routes"],
-      checksum: "sha256:b2c3d4e5f6a1...",
-    },
-    {
-      id: "backup_20240113_143000",
-      name: "Respaldo Manual Pre-Actualización",
-      type: "manual",
-      status: "completed",
-      size: "2.3 GB",
-      duration: "10 min",
-      createdAt: "2024-01-13 14:30:00",
-      location: "local",
-      encrypted: true,
-      tables: ["users", "shipments", "invoices", "customers", "routes"],
-      checksum: "sha256:c3d4e5f6a1b2...",
-    },
-    {
-      id: "backup_20240112_020000",
-      name: "Respaldo Automático Diario",
-      type: "automatic",
-      status: "failed",
-      size: "0 GB",
-      duration: "0 min",
-      createdAt: "2024-01-12 02:00:00",
-      location: "none",
-      encrypted: false,
-      tables: [],
-      error: "Error de conexión con el almacenamiento en la nube",
-    },
-  ]);
-  const [systemStatus, setSystemStatus] = useState({
-    database: {
-      status: "healthy",
-      size: "15.2 GB",
-      lastBackup: "2024-01-15 02:00:00",
-      nextBackup: "2024-01-16 02:00:00",
-    },
-    storage: {
-      local: { available: "45.8 GB", used: "12.2 GB", total: "58.0 GB" },
-      cloud: { available: "∞", used: "8.7 GB", total: "100 GB" },
-    },
-    performance: { avgBackupTime: "11 min", successRate: 95.2, lastMonth: 28 },
-  });
+  // Usar datos reales del hook en lugar de datos hardcodeados
+  const backupHistory = historial || [];
+  const systemStatus = estadisticas?.sistema || {
+    estado: "warning",
+    tamanoBD: "N/A",
+    ultimoRespaldo: null,
+    proximoRespaldo: null,
+  };
+  const storageStatus = estadisticas?.almacenamiento || {
+    local: { usado: "0 GB", disponible: "N/A", total: "N/A" },
+    nube: { usado: "0 GB", disponible: "N/A", total: "N/A" },
+  };
+  const performanceStats = estadisticas?.estadisticas || {
+    totalRespaldos: 0,
+    respaldosExitosos: 0,
+    respaldosFallidos: 0,
+    tasaExito: 0,
+    tiempoPromedio: 0,
+  };
   const getStatusBadge = (status) => {
     const config = {
       completed: {
@@ -228,28 +191,160 @@ export default function RespaldoPage() {
   const handleStartBackup = async () => {
     try {
       setIsBackupRunning(true);
-      setBackupProgress(0); // Crear respaldo usando la Server Actio n
+      setBackupProgress(0);
+      setLocalLoading(true);
+
+      // Verificar sistema antes de crear respaldo (opcional, pero recomendado)
+      try {
+        const verificacion = await fetch("/api/respaldos/verificar");
+        const verificacionData = await verificacion.json();
+
+        if (!verificacionData.todoOk) {
+          const problemas = [];
+          if (!verificacionData.verificaciones.pgDump.disponible) {
+            problemas.push(verificacionData.verificaciones.pgDump.mensaje);
+          }
+          if (!verificacionData.verificaciones.databaseUrl.valida) {
+            problemas.push(verificacionData.verificaciones.databaseUrl.mensaje);
+          }
+          if (!verificacionData.verificaciones.permisos.tienePermisos) {
+            problemas.push(verificacionData.verificaciones.permisos.mensaje);
+          }
+
+          toast.error(
+            `No se puede crear el respaldo. Problemas detectados:\n${problemas.join(
+              "\n"
+            )}`,
+            { duration: 10000 }
+          );
+          setIsBackupRunning(false);
+          setLocalLoading(false);
+          return;
+        }
+      } catch (error) {
+        console.warn(
+          "No se pudo verificar el sistema, continuando de todas formas:",
+          error
+        );
+        // Continuar de todas formas, la verificación es opcional
+      }
+
+      // Crear respaldo usando la Server Action
       const respaldoData = {
-        nombre: "Respaldo Manual",
+        nombre: `Respaldo Manual - ${new Date().toLocaleString("es-PE")}`,
         descripcion: "Respaldo creado manualmente desde la interfaz",
         tipo: "MANUAL",
         incluyeArchivos: false,
         tablasIncluidas: [],
       };
-      await crearRespaldo(respaldoData); // Simular progreso del backup para la U I
-      const interval = setInterval(() => {
-        setBackupProgress((prev) => {
-          if (prev >= 100) {
-            clearInterval(interval);
-            setIsBackupRunning(false);
-            return 100;
+
+      const result = await crearRespaldo(respaldoData);
+
+      if (result) {
+        // El respaldo se inició correctamente
+        setBackupProgress(10);
+        toast.success(
+          "Respaldo iniciado correctamente. Se ejecutará en segundo plano."
+        );
+
+        const respaldoId = result.id;
+        let progressInterval;
+
+        // Función para verificar el progreso usando el hook
+        const verificarProgreso = async () => {
+          try {
+            // Refrescar datos para obtener el progreso real
+            await refrescar();
+
+            // Esperar un momento para que se actualice el estado
+            await new Promise((resolve) => setTimeout(resolve, 1000));
+
+            // Obtener el historial actualizado directamente desde el hook
+            // Usamos obtenerHistorialRespaldos para obtener datos frescos
+            const historialActualizado = await obtenerHistorialRespaldos(
+              1,
+              100
+            );
+
+            if (historialActualizado?.success) {
+              const respaldoReciente = historialActualizado.data.respaldos.find(
+                (r) => r.id === respaldoId
+              );
+
+              if (respaldoReciente) {
+                const progreso = respaldoReciente.progreso || 0;
+                setBackupProgress(progreso);
+
+                // Si está completado o fallido, detener el intervalo
+                if (
+                  respaldoReciente.estado === "COMPLETADO" ||
+                  respaldoReciente.estado === "FALLIDO"
+                ) {
+                  if (progressInterval) {
+                    clearInterval(progressInterval);
+                  }
+                  setIsBackupRunning(false);
+                  setBackupProgress(
+                    respaldoReciente.estado === "COMPLETADO" ? 100 : 0
+                  );
+
+                  if (respaldoReciente.estado === "COMPLETADO") {
+                    toast.success("Respaldo completado exitosamente");
+                  } else {
+                    toast.error(
+                      `Respaldo falló: ${
+                        respaldoReciente.mensajeError || "Error desconocido"
+                      }`
+                    );
+                  }
+
+                  // Refrescar datos finales
+                  await refrescar();
+                  return true; // Indicar que se completó
+                }
+              } else {
+                // Si no encontramos el respaldo, puede que aún no se haya creado en BD
+                // Continuar verificando
+              }
+            }
+            return false; // Continuar verificando
+          } catch (error) {
+            console.error("Error al verificar progreso:", error);
+            return false;
           }
-          return prev + Math.random() * 15;
-        });
-      }, 500);
+        };
+
+        // Verificar progreso inmediatamente y luego cada 3 segundos
+        verificarProgreso(); // Primera verificación inmediata
+        progressInterval = setInterval(async () => {
+          const completado = await verificarProgreso();
+          if (completado && progressInterval) {
+            clearInterval(progressInterval);
+          }
+        }, 3000);
+
+        // Timeout de seguridad (30 minutos)
+        setTimeout(() => {
+          if (progressInterval) {
+            clearInterval(progressInterval);
+          }
+          if (isBackupRunning) {
+            setIsBackupRunning(false);
+            toast.warning(
+              "El respaldo está tomando más tiempo del esperado. Verifica el estado en el historial."
+            );
+          }
+        }, 30 * 60 * 1000);
+      }
     } catch (error) {
+      handleError(error, {
+        context: { action: "crearRespaldo" },
+        defaultMessage: "Error al crear respaldo",
+      });
       setIsBackupRunning(false);
       setBackupProgress(0);
+    } finally {
+      setLocalLoading(false);
     }
   };
   const handleRestoreBackup = (backup) => {
@@ -257,23 +352,41 @@ export default function RespaldoPage() {
     setIsRestoreDialogOpen(true);
   };
   const confirmRestore = async () => {
-    setLoading(true); // Simular restauració n
-    setTimeout(() => {
-      setLoading(false);
+    if (!selectedBackup) return;
+
+    try {
+      setLocalLoading(true);
+      await restaurarRespaldo(selectedBackup.id, {
+        crearRespaldoAntes: true,
+        restaurarCompleto: true,
+        sobrescribirDatos: false,
+      });
       setIsRestoreDialogOpen(false);
       setSelectedBackup(null);
-    }, 3000);
+      await refrescar();
+    } catch (error) {
+      handleError(error, {
+        context: { action: "restaurarRespaldo", backupId: selectedBackup.id },
+        defaultMessage: "Error al restaurar respaldo",
+      });
+    } finally {
+      setLocalLoading(false);
+    }
   };
-  const handleDeleteBackup = (backupId) => {
-    setBackupHistory((prev) => prev.filter((backup) => backup.id !== backupId));
+  const handleDeleteBackup = async (backupId) => {
+    try {
+      if (confirm("¿Estás seguro de que deseas eliminar este respaldo?")) {
+        await eliminarRespaldo(backupId);
+        await refrescar();
+      }
+    } catch (error) {
+      handleError(error, {
+        context: { action: "eliminarRespaldo", backupId },
+        defaultMessage: "Error al eliminar respaldo",
+      });
+    }
   };
-  const handleDownloadBackup = (backup) => {};
-  const formatFileSize = (bytes) => {
-    const sizes = ["Bytes", "KB", "MB", "GB", "TB"];
-    if (bytes === 0) return "0 Bytes";
-    const i = Math.floor(Math.log(bytes) / Math.log(1024));
-    return Math.round((bytes / Math.pow(1024, i)) * 100) / 100 + " " + sizes[i];
-  };
+  const handleDownloadBackup = () => {};
   const getHealthStatus = (status) => {
     const config = {
       healthy: { color: "text-green-600", icon: CheckCircle },
@@ -289,7 +402,7 @@ export default function RespaldoPage() {
     );
   };
   return (
-    <div className="flex-1 space-y-4 p-4 md:p-8 pt-6">
+    <div className="flex-1 space-y-4">
       <div className="flex items-center justify-between space-y-2">
         <h2 className="text-3xl font-bold tracking-tight">
           Respaldo y Recuperación
@@ -347,9 +460,9 @@ export default function RespaldoPage() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-2">
-                  {getHealthStatus(systemStatus.database.status)}
+                  {getHealthStatus(systemStatus.estado || "warning")}
                   <p className="text-xs text-muted-foreground">
-                    Tamaño: {systemStatus.database.size}
+                    Tamaño: {systemStatus.tamanoBD || "N/A"}
                   </p>
                 </div>
               </CardContent>
@@ -362,9 +475,27 @@ export default function RespaldoPage() {
                 <Clock className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-green-600">Exitoso</div>
+                <div
+                  className={`text-2xl font-bold ${
+                    systemStatus.ultimoRespaldo?.estado === "COMPLETADO"
+                      ? "text-green-600"
+                      : systemStatus.ultimoRespaldo?.estado === "FALLIDO"
+                      ? "text-red-600"
+                      : "text-yellow-600"
+                  }`}
+                >
+                  {systemStatus.ultimoRespaldo?.estado === "COMPLETADO"
+                    ? "Exitoso"
+                    : systemStatus.ultimoRespaldo?.estado === "FALLIDO"
+                    ? "Fallido"
+                    : "N/A"}
+                </div>
                 <p className="text-xs text-muted-foreground">
-                  {systemStatus.database.lastBackup}
+                  {systemStatus.ultimoRespaldo?.fecha
+                    ? new Date(
+                        systemStatus.ultimoRespaldo.fecha
+                      ).toLocaleString("es-PE")
+                    : "Sin respaldos"}
                 </p>
               </CardContent>
             </Card>
@@ -378,7 +509,11 @@ export default function RespaldoPage() {
               <CardContent>
                 <div className="text-2xl font-bold">Programado</div>
                 <p className="text-xs text-muted-foreground">
-                  {systemStatus.database.nextBackup}
+                  {systemStatus.proximoRespaldo
+                    ? new Date(systemStatus.proximoRespaldo).toLocaleString(
+                        "es-PE"
+                      )
+                    : "No programado"}
                 </p>
               </CardContent>
             </Card>
@@ -391,10 +526,10 @@ export default function RespaldoPage() {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">
-                  {systemStatus.performance.successRate}%
+                  {performanceStats.tasaExito?.toFixed(1) || 0}%
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  Últimos {systemStatus.performance.lastMonth} respaldos
+                  {performanceStats.totalRespaldos || 0} respaldos totales
                 </p>
               </CardContent>
             </Card>
@@ -410,21 +545,14 @@ export default function RespaldoPage() {
                 <div className="space-y-2">
                   <div className="flex justify-between text-sm">
                     <span>Usado</span>
-                    <span>{systemStatus.storage.local.used}</span>
+                    <span>{storageStatus.local.usado || "0 GB"}</span>
                   </div>
-                  <Progress
-                    value={
-                      (parseFloat(systemStatus.storage.local.used) /
-                        parseFloat(systemStatus.storage.local.total)) *
-                      100
-                    }
-                    className="w-full"
-                  />
+                  <Progress value={50} className="w-full" />
                   <div className="flex justify-between text-xs text-muted-foreground">
                     <span>
-                      Disponible: {systemStatus.storage.local.available}
+                      Disponible: {storageStatus.local.disponible || "N/A"}
                     </span>
-                    <span>Total: {systemStatus.storage.local.total}</span>
+                    <span>Total: {storageStatus.local.total || "N/A"}</span>
                   </div>
                 </div>
               </CardContent>
@@ -439,21 +567,14 @@ export default function RespaldoPage() {
                 <div className="space-y-2">
                   <div className="flex justify-between text-sm">
                     <span>Usado</span>
-                    <span>{systemStatus.storage.cloud.used}</span>
+                    <span>{storageStatus.nube.usado || "0 GB"}</span>
                   </div>
-                  <Progress
-                    value={
-                      (parseFloat(systemStatus.storage.cloud.used) /
-                        parseFloat(systemStatus.storage.cloud.total)) *
-                      100
-                    }
-                    className="w-full"
-                  />
+                  <Progress value={10} className="w-full" />
                   <div className="flex justify-between text-xs text-muted-foreground">
                     <span>
-                      Disponible: {systemStatus.storage.cloud.available}
+                      Disponible: {storageStatus.nube.disponible || "N/A"}
                     </span>
-                    <span>Total: {systemStatus.storage.cloud.total}</span>
+                    <span>Total: {storageStatus.nube.total || "N/A"}</span>
                   </div>
                 </div>
               </CardContent>
@@ -472,79 +593,176 @@ export default function RespaldoPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Nombre</TableHead> <TableHead>Tipo</TableHead>
-                    <TableHead>Estado</TableHead> <TableHead>Tamaño</TableHead>
-                    <TableHead>Duración</TableHead> <TableHead>Fecha</TableHead>
+                    <TableHead>Nombre</TableHead>
+                    <TableHead>Tipo</TableHead>
+                    <TableHead>Estado</TableHead>
+                    <TableHead>Tamaño</TableHead>
+                    <TableHead>Duración</TableHead>
+                    <TableHead>Fecha</TableHead>
                     <TableHead>Ubicación</TableHead>
                     <TableHead>Acciones</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {backupHistory.map((backup) => (
-                    <TableRow key={backup.id}>
-                      <TableCell className="font-medium">
-                        <div className="flex items-center">
-                          {backup.encrypted && (
-                            <Lock className="mr-2 h-4 w-4 text-green-600" />
-                          )}
-                          {backup.name}
-                        </div>
-                      </TableCell>
-                      <TableCell>{getTypeBadge(backup.type)}</TableCell>
-                      <TableCell>{getStatusBadge(backup.status)}</TableCell>
-                      <TableCell>{backup.size}</TableCell>
-                      <TableCell>{backup.duration}</TableCell>
-                      <TableCell className="text-sm text-muted-foreground">
-                        {backup.createdAt}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center space-x-1">
-                          {backup.location.includes("local") && (
-                            <Badge variant="outline" className="text-xs">
-                              <HardDrive className="mr-1 h-3 w-3" /> Local
-                            </Badge>
-                          )}
-                          {backup.location.includes("cloud") && (
-                            <Badge variant="outline" className="text-xs">
-                              <Cloud className="mr-1 h-3 w-3" /> Nube
-                            </Badge>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex space-x-2">
-                          {backup.status === "completed" && (
-                            <>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => handleRestoreBackup(backup)}
-                              >
-                                <RotateCcw className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => handleDownloadBackup(backup)}
-                              >
-                                <Download className="h-4 w-4" />
-                              </Button>
-                            </>
-                          )}
-                          <Button variant="outline" size="sm">
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleDeleteBackup(backup.id)}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
+                  {loading ? (
+                    <TableRow>
+                      <TableCell colSpan={8} className="text-center py-8">
+                        <RefreshCw className="h-6 w-6 animate-spin mx-auto mb-2" />
+                        <p className="text-muted-foreground">
+                          Cargando respaldos...
+                        </p>
                       </TableCell>
                     </TableRow>
-                  ))}
+                  ) : backupHistory.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={8} className="text-center py-8">
+                        <Database className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+                        <p className="text-muted-foreground">
+                          No hay respaldos registrados
+                        </p>
+                        <Button
+                          className="mt-4"
+                          onClick={handleStartBackup}
+                          disabled={isBackupRunning}
+                        >
+                          <Database className="mr-2 h-4 w-4" /> Crear primer
+                          respaldo
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    backupHistory.map((backup) => {
+                      const StatusIcon =
+                        backup.estado === "COMPLETADO"
+                          ? CheckCircle
+                          : backup.estado === "FALLIDO"
+                          ? XCircle
+                          : backup.estado === "EN_PROGRESO"
+                          ? RefreshCw
+                          : Clock;
+
+                      return (
+                        <TableRow key={backup.id}>
+                          <TableCell className="font-medium">
+                            <div className="flex items-center">
+                              {backup.encriptado && (
+                                <Lock className="mr-2 h-4 w-4 text-green-600" />
+                              )}
+                              {backup.nombre}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <Badge
+                              className={
+                                backup.tipo === "AUTOMATICO"
+                                  ? "bg-blue-100 text-blue-800"
+                                  : backup.tipo === "MANUAL"
+                                  ? "bg-purple-100 text-purple-800"
+                                  : "bg-gray-100 text-gray-800"
+                              }
+                            >
+                              {backup.tipo === "AUTOMATICO"
+                                ? "Automático"
+                                : backup.tipo === "MANUAL"
+                                ? "Manual"
+                                : backup.tipo}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <Badge
+                              className={getStatusBadgeColor(backup.estado)}
+                            >
+                              <StatusIcon
+                                className={`mr-1 h-3 w-3 ${
+                                  backup.estado === "EN_PROGRESO"
+                                    ? "animate-spin"
+                                    : ""
+                                }`}
+                              />
+                              {backup.estado === "COMPLETADO"
+                                ? "Completado"
+                                : backup.estado === "FALLIDO"
+                                ? "Fallido"
+                                : backup.estado === "EN_PROGRESO"
+                                ? "En progreso"
+                                : backup.estado === "INICIADO"
+                                ? "Iniciado"
+                                : backup.estado}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            {backup.tamano
+                              ? formatBytes(Number(backup.tamano))
+                              : "N/A"}
+                          </TableCell>
+                          <TableCell>
+                            {backup.duracion
+                              ? formatDuration(backup.duracion)
+                              : "N/A"}
+                          </TableCell>
+                          <TableCell className="text-sm text-muted-foreground">
+                            {backup.fechaInicio
+                              ? new Date(backup.fechaInicio).toLocaleString(
+                                  "es-PE"
+                                )
+                              : "N/A"}
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center space-x-1">
+                              {backup.almacenamientoLocal && (
+                                <Badge variant="outline" className="text-xs">
+                                  <HardDrive className="mr-1 h-3 w-3" /> Local
+                                </Badge>
+                              )}
+                              {backup.almacenamientoNube && (
+                                <Badge variant="outline" className="text-xs">
+                                  <Cloud className="mr-1 h-3 w-3" /> Nube
+                                </Badge>
+                              )}
+                              {!backup.almacenamientoLocal &&
+                                !backup.almacenamientoNube && (
+                                  <span className="text-xs text-muted-foreground">
+                                    N/A
+                                  </span>
+                                )}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex space-x-2">
+                              {backup.estado === "COMPLETADO" && (
+                                <>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => handleRestoreBackup(backup)}
+                                  >
+                                    <RotateCcw className="h-4 w-4" />
+                                  </Button>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => handleDownloadBackup(backup)}
+                                  >
+                                    <Download className="h-4 w-4" />
+                                  </Button>
+                                </>
+                              )}
+                              <Button variant="outline" size="sm">
+                                <Eye className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleDeleteBackup(backup.id)}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })
+                  )}
                 </TableBody>
               </Table>
             </CardContent>
@@ -813,8 +1031,15 @@ export default function RespaldoPage() {
             >
               Cancelar
             </Button>
-            <Button onClick={confirmRestore} disabled={loading}>
-              {loading ? "Restaurando..." : "Confirmar Restauración"}
+            <Button onClick={confirmRestore} disabled={localLoading || loading}>
+              {localLoading || loading ? (
+                <>
+                  <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                  Restaurando...
+                </>
+              ) : (
+                "Confirmar Restauración"
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>

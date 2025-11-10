@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useTransition } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { useErrorHandler } from "@/hooks/useErrorHandler";
 import {
   Table,
   TableBody,
@@ -77,7 +78,6 @@ import ClienteForm from "@/components/clientes/cliente-form";
 import ClienteDetalle from "@/components/clientes/cliente-detalle";
 import {
   deleteCliente,
-  toggleClienteEstado,
   reactivateCliente,
   getClientes,
 } from "@/lib/actions/clientes";
@@ -87,6 +87,10 @@ import {
   prepareForPrint,
   copyToClipboard,
 } from "@/lib/utils/export-utils";
+import EstadisticasRapidasClientes from "./estadisticas-rapidas";
+import ClientesFiltros from "./clientes-filtros";
+import ClienteTabla from "./cliente-tabla";
+import Modal from "../ui/modal";
 
 export default function ClientesClient({
   initialClientes,
@@ -94,9 +98,11 @@ export default function ClientesClient({
   totalClientes,
   currentPage,
   searchParams = {},
+  estadisticas = null,
 }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
+  const { handleError, handleAsyncError } = useErrorHandler();
   const [clientes, setClientes] = useState(initialClientes);
   const totalPagesNum = Math.max(totalPages || 1, 1);
 
@@ -142,10 +148,10 @@ export default function ClientesClient({
           return (
             parseInt(urlParams.get("limit")) ||
             parseInt(searchParams?.limit) ||
-            10
+            8
           );
         } catch {
-          return parseInt(searchParams?.limit) || 10;
+          return parseInt(searchParams?.limit) || 8;
         }
       })();
 
@@ -178,10 +184,16 @@ export default function ClientesClient({
         const newUrl = `/dashboard/clientes?${params.toString()}`;
         window.history.replaceState({}, "", newUrl);
       } else {
-        toast.error("Error al aplicar filtros: " + result.error);
+        handleError(new Error(result.error), {
+          context: { action: "applyFilters" },
+          defaultMessage: "Error al aplicar filtros",
+        });
       }
     } catch (error) {
-      toast.error("Error al aplicar filtros");
+      handleError(error, {
+        context: { action: "applyFilters" },
+        defaultMessage: "Error al aplicar filtros",
+      });
     }
   }, []);
 
@@ -193,24 +205,6 @@ export default function ClientesClient({
 
     return () => clearTimeout(timer);
   }, [searchQuery, applyFiltersRealTime, tipoDocumentoFilter, estadoFilter]);
-
-  // Para filtros de select (sin delay)
-  const handleSelectFilterChange = useCallback(
-    (filterType, value) => {
-      if (filterType === "tipoDocumento") {
-        setTipoDocumentoFilter(value);
-      } else if (filterType === "estado") {
-        setEstadoFilter(value);
-      }
-
-      // Aplicar filtros inmediatamente para selects
-      const newTipoDoc =
-        filterType === "tipoDocumento" ? value : tipoDocumentoFilter;
-      const newEstado = filterType === "estado" ? value : estadoFilter;
-      applyFiltersRealTime(searchQuery, newTipoDoc, newEstado);
-    },
-    [searchQuery, tipoDocumentoFilter, estadoFilter, applyFiltersRealTime]
-  );
 
   // Función para cambiar página
   const handlePageChange = (page) => {
@@ -238,52 +232,49 @@ export default function ClientesClient({
     }
   };
 
-  // Función para activar/desactivar cliente
-  const handleToggleEstado = async (cliente) => {
-    try {
-      const result = await toggleClienteEstado(cliente.id);
-      if (result.success) {
-        const accion = result.data.estado ? "activado" : "desactivado";
-        toast.success(`Cliente ${accion} correctamente`);
-        // Actualizar el estado local inmediatamente
-        setClientes((prevClientes) =>
-          prevClientes.map((c) =>
-            c.id === cliente.id ? { ...c, estado: result.data.estado } : c
-          )
-        );
-        // Refrescar desde el servidor después de un pequeño delay
-        setTimeout(() => {
-          router.refresh();
-        }, 500);
-      } else {
-        toast.error(result.error || "Error al cambiar estado del cliente");
-      }
-    } catch (error) {
-      toast.error("Error al cambiar estado del cliente");
-    }
-  };
-
-  // Función para reactivar cliente inactivo
+  // Función para reactivar/restaurar cliente
   const handleReactivate = async (cliente) => {
     try {
       const result = await reactivateCliente(cliente.id);
       if (result.success) {
-        toast.success("Cliente reactivado correctamente");
-        // Actualizar el estado local inmediatamente
-        setClientes((prevClientes) =>
-          prevClientes.map((c) =>
-            c.id === cliente.id ? { ...c, estado: true } : c
-          )
+        const isDeleted = !!cliente.deletedAt;
+        toast.success(
+          isDeleted 
+            ? "Cliente restaurado correctamente" 
+            : "Cliente reactivado correctamente"
         );
-        // Refrescar desde el servidor después de un pequeño delay
-        setTimeout(() => {
-          router.refresh();
-        }, 500);
+
+        // Si el filtro actual es "deleted" o "Solo inactivos", remover el cliente de la lista
+        if (estadoFilter === "deleted" || estadoFilter === "false") {
+          setClientes((prevClientes) =>
+            prevClientes.filter((c) => c.id !== cliente.id)
+          );
+        } else {
+          // Si no es el filtro de eliminados/inactivos, actualizar el estado local
+          setClientes((prevClientes) =>
+            prevClientes.map((c) =>
+              c.id === cliente.id ? { ...c, estado: true, deletedAt: null } : c
+            )
+          );
+        }
+
+        // Recargar la lista desde el servidor con los filtros actuales
+        await applyFiltersRealTime(
+          searchQuery,
+          tipoDocumentoFilter,
+          estadoFilter
+        );
+        
+        // Si se restauró desde la vista de eliminados, cambiar a vista de activos
+        if (isDeleted && estadoFilter === "deleted") {
+          setEstadoFilter("ACTIVE_ONLY");
+          router.push("/dashboard/clientes?estado=ACTIVE_ONLY");
+        }
       } else {
-        toast.error(result.error || "Error al reactivar cliente");
+        toast.error(result.error || "Error al restaurar cliente");
       }
     } catch (error) {
-      toast.error("Error al reactivar cliente");
+      toast.error("Error al restaurar cliente");
     }
   };
 
@@ -332,9 +323,9 @@ export default function ClientesClient({
   };
 
   const getBadgeVariant = (cliente) => {
-    // if (cliente.deletedAt) {
-    //   return "outline"; // Cliente eliminado (soft delete)
-    // }
+    if (cliente.deletedAt) {
+      return "outline"; // Cliente eliminado (soft delete)
+    }
     switch (cliente.estado) {
       case true:
         return "default"; // Cliente activo
@@ -346,14 +337,17 @@ export default function ClientesClient({
   };
 
   const getEstadoText = (cliente) => {
-    // if (cliente.deletedAt) {
-    //   return "Eliminado";
-    // }
+    if (cliente.deletedAt) {
+      const fechaEliminacion = new Date(cliente.deletedAt);
+      return `Eliminado el ${fechaEliminacion.toLocaleDateString("es-PE")}`;
+    }
     return cliente.estado ? "Activo" : "Inactivo";
   };
 
+  const isDeletedView = estadoFilter === "deleted";
+
   return (
-    <div className="container mx-auto p-6 space-y-6">
+    <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
@@ -422,145 +416,38 @@ export default function ClientesClient({
         </div>
       </div>
       {/* Stats Cards */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 stats-cards">
-        <Card className="stats-card">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
-              Total Clientes
-            </CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{totalClientes}</div>
-          </CardContent>
-        </Card>
-        <Card className="stats-card">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Activos</CardTitle>
-            <Building2 className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {clientes.filter((c) => c.estado === true).length}
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="stats-card">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Inactivos</CardTitle>
-            <Building2 className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {clientes.filter((c) => c.estado === false).length}
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="stats-card">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Esta Página</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{clientes.length}</div>
-          </CardContent>
-        </Card>
-      </div>
+      <EstadisticasRapidasClientes
+        totalClientes={totalClientes}
+        clientes={clientes}
+        estadisticas={estadisticas}
+      />
 
       {/* Filters */}
-      <Card className="no-print">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Filter className="h-5 w-5" />
-            Filtros
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid gap-4 md:grid-cols-4">
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Buscar</label>
-              <div className="relative">
-                <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Nombre, documento, email..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-8"
-                />
-              </div>
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Tipo Documento</label>
-              <Select
-                value={tipoDocumentoFilter}
-                onValueChange={(value) =>
-                  handleSelectFilterChange("tipoDocumento", value)
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Todos" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="ALL">Todos</SelectItem>
-                  <SelectItem value="DNI">DNI</SelectItem>
-                  <SelectItem value="RUC">RUC</SelectItem>
-                  <SelectItem value="CARNET_EXTRANJERIA">
-                    Carnet de Extranjería
-                  </SelectItem>
-                  <SelectItem value="PASAPORTE">Pasaporte</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Estado</label>
-              <Select
-                value={estadoFilter}
-                onValueChange={(value) =>
-                  handleSelectFilterChange("estado", value)
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Solo activos" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="ACTIVE_ONLY">Solo activos</SelectItem>
-                  <SelectItem value="ALL">
-                    Todos (activos e inactivos)
-                  </SelectItem>
-                  <SelectItem value="false">Solo inactivos</SelectItem>
-                  <SelectItem value="deleted">Solo eliminados</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="flex items-end">
-              <div className="w-full p-3 rounded-lg bg-muted/50 border border-dashed">
-                <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
-                  {isPending ? (
-                    <>
-                      <RefreshCw className="h-4 w-4 animate-spin" />
-                      Filtrando en tiempo real...
-                    </>
-                  ) : (
-                    <>
-                      <Search className="h-4 w-4" />
-                      Filtros en tiempo real activos
-                    </>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      <ClientesFiltros
+        searchQuery={searchQuery}
+        setSearchQuery={setSearchQuery}
+        tipoDocumentoFilter={tipoDocumentoFilter}
+        setTipoDocumentoFilter={setTipoDocumentoFilter}
+        estadoFilter={estadoFilter}
+        setEstadoFilter={setEstadoFilter}
+      />
+
       {/* Table */}
       <Card>
         <CardHeader>
-          <CardTitle>Lista de Clientes</CardTitle>
+          <CardTitle>
+            {isDeletedView ? "Clientes Eliminados" : "Lista de Clientes"}
+          </CardTitle>
           <CardDescription>
+            {isDeletedView && (
+              <span className="text-amber-600 font-medium mb-2 block">
+                Estos clientes han sido eliminados. Puedes restaurarlos haciendo clic en "Restaurar".
+              </span>
+            )}
             <ResultsCounter
               count={clientes.length}
               total={totalClientes}
-              entityLabel="clientes"
+              entityLabel={isDeletedView ? "clientes eliminados" : "clientes"}
             />
             {isPending && (
               <span className="ml-2 text-blue-600">
@@ -576,269 +463,89 @@ export default function ClientesClient({
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="relative">
-            {/* Loading overlay */}
-            {isPending && (
-              <div className="absolute inset-0 bg-background/80 backdrop-blur-sm z-10 flex items-center justify-center rounded-md">
-                <div className="flex flex-col items-center gap-2">
-                  <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full"></div>
-                  <p className="text-sm text-muted-foreground">
-                    Cargando clientes...
-                  </p>
-                </div>
-              </div>
-            )}
-            <div
-              className="rounded-md border"
-              role="region"
-              aria-label="Tabla de clientes"
-              tabIndex={0}
-            >
-              <Table aria-label="Lista de clientes registrados">
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Cliente</TableHead>
-                    <TableHead>Documento</TableHead>
-                    <TableHead>Contacto</TableHead>
-                    <TableHead>Ubicación</TableHead>
-                    <TableHead>Estado</TableHead>
-                    <TableHead className="text-right no-print">
-                      Acciones
-                    </TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {clientes.map((cliente, index) => (
-                    <TableRow
-                      key={cliente.id}
-                      className="animate-in fade-in slide-in-from-bottom-2 hover:bg-muted/50 transition-colors duration-200"
-                      style={{
-                        animationDelay: `${index * 50}ms`,
-                        animationFillMode: "backwards",
-                      }}
-                    >
-                      <TableCell>
-                        <div className="space-y-1">
-                          <div className="font-medium capitalize">
-                            {cliente.tipoDocumento === "DNI"
-                              ? `${cliente.nombre} ${cliente.apellidos}`
-                              : cliente.razonSocial}
-                          </div>
-                          <div className="text-sm text-muted-foreground">
-                            {cliente.tipoDocumento === "DNI"
-                              ? "PERSONA NATURAL"
-                              : "PERSONA JURIDICA"}
-                          </div>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="space-y-1">
-                          <div className="font-medium">
-                            {cliente.numeroDocumento}
-                          </div>
-                          <div className="text-sm text-muted-foreground">
-                            {cliente.tipoDocumento}
-                          </div>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="space-y-1">
-                          {cliente.email && (
-                            <div className="flex items-center gap-1 text-sm">
-                              <Mail className="h-3 w-3" />
-                              {cliente.email}
-                            </div>
-                          )}
-                          {cliente.telefono && (
-                            <div className="flex items-center gap-1 text-sm">
-                              <Phone className="h-3 w-3" />
-                              {cliente.telefono}
-                            </div>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-1 text-sm">
-                          <MapPin className="h-3 w-3" />
-                          <span className="truncate max-w-[200px]">
-                            {formatearDireccion(cliente)}
-                          </span>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={getBadgeVariant(cliente)}>
-                          {getEstadoText(cliente)}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right no-print">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" className="h-8 w-8 p-0">
-                              <span className="sr-only">Abrir menú</span>
-                              <MoreHorizontal className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuLabel>Acciones</DropdownMenuLabel>
-                            <DropdownMenuItem
-                              onClick={() => {
-                                setSelectedCliente(cliente);
-                                setShowDetailModal(true);
-                              }}
-                            >
-                              <Eye className="mr-2 h-4 w-4" />
-                              Ver detalles
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              onClick={() => {
-                                setSelectedCliente(cliente);
-                                setShowEditModal(true);
-                              }}
-                            >
-                              <Edit className="mr-2 h-4 w-4" />
-                              Editar
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            {/* Mostrar opciones según el estado del cliente */}
-                            {false ? ( // Comentado: cliente.deletedAt
-                              // Cliente eliminado (soft delete) - Solo restaurar
-                              <DropdownMenuItem
-                                onClick={() => handleReactivate(cliente)}
-                                className="text-green-600"
-                              >
-                                <RefreshCw className="mr-2 h-4 w-4" />
-                                Restaurar
-                              </DropdownMenuItem>
-                            ) : (
-                              // Cliente no eliminado - Opciones normales
-                              <>
-                                {!cliente.estado && (
-                                  <DropdownMenuItem
-                                    onClick={() => handleReactivate(cliente)}
-                                    className="text-green-600"
-                                  >
-                                    <RefreshCw className="mr-2 h-4 w-4" />
-                                    Reactivar
-                                  </DropdownMenuItem>
-                                )}
-                                <DropdownMenuItem
-                                  onClick={() => handleToggleEstado(cliente)}
-                                  className={
-                                    cliente.estado
-                                      ? "text-orange-600"
-                                      : "text-green-600"
-                                  }
-                                >
-                                  {cliente.estado ? (
-                                    <>
-                                      <Trash2 className="mr-2 h-4 w-4" />
-                                      Desactivar
-                                    </>
-                                  ) : (
-                                    <>
-                                      <Eye className="mr-2 h-4 w-4" />
-                                      Activar
-                                    </>
-                                  )}
-                                </DropdownMenuItem>
-                              </>
-                            )}
-                            {cliente.estado && (
-                              <DropdownMenuItem
-                                onClick={() => {
-                                  setSelectedCliente(cliente);
-                                  setShowDeleteDialog(true);
-                                }}
-                                className="text-destructive"
-                              >
-                                <Trash2 className="mr-2 h-4 w-4" />
-                                Desactivar permanentemente
-                              </DropdownMenuItem>
-                            )}
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          </div>
+          <ClienteTabla
+            clientes={clientes}
+            isPending={isPending}
+            handleReactivate={handleReactivate}
+            formatearDireccion={formatearDireccion}
+            getBadgeVariant={getBadgeVariant}
+            getEstadoText={getEstadoText}
+            setSelectedCliente={setSelectedCliente}
+            setShowDetailModal={setShowDetailModal}
+            setShowEditModal={setShowEditModal}
+            setShowDeleteDialog={setShowDeleteDialog}
+            isDeletedView={isDeletedView}
+          />
 
           {/* Pagination (componente reutilizable) */}
           <Paginator
+            className="mt-4"
             currentPage={currentPage}
             totalPages={totalPagesNum}
             onPageChange={handlePageChange}
-            itemsPerPage={Number(searchParams.limit) || 10}
-            onItemsPerPageChange={(newLimit) => {
-              const params = new URLSearchParams(window.location.search);
-              params.set("limit", String(newLimit));
-              params.set("page", "1");
-              router.push(`/dashboard/clientes?${params.toString()}`);
-            }}
-            itemsPerPageOptions={[10, 20, 50, 100]}
-            showItemsPerPage
-            showNumbers
-            showAlways
+            limit={Number(searchParams.limit) || 8}
+            total={totalClientes}
+            entityLabel="clientes"
           />
         </CardContent>
       </Card>
 
       {/* Modales */}
-      <Dialog open={showCreateModal} onOpenChange={setShowCreateModal}>
-        <DialogContent className="min-w-4xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Crear Nuevo Cliente</DialogTitle>
-            <DialogDescription>
-              Completa la información del nuevo cliente
-            </DialogDescription>
-          </DialogHeader>
-          <ClienteForm onSuccess={handleSuccess} />
-        </DialogContent>
-      </Dialog>
+      <Modal
+        open={showCreateModal}
+        onOpenChange={setShowCreateModal}
+        title="Crear Nuevo Cliente"
+        description="Completa la información del nuevo cliente"
+        size="xl"
+      >
+        <ClienteForm onSuccess={handleSuccess} />
+      </Modal>
 
-      <Dialog open={showEditModal} onOpenChange={setShowEditModal}>
-        <DialogContent className="min-w-4xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Editar Cliente</DialogTitle>
-            <DialogDescription>
-              Modifica la información del cliente
-            </DialogDescription>
-          </DialogHeader>
-          {selectedCliente && (
-            <ClienteForm cliente={selectedCliente} onSuccess={handleSuccess} />
-          )}
-        </DialogContent>
-      </Dialog>
+      <Modal
+        open={showEditModal}
+        onOpenChange={setShowEditModal}
+        title="Editar Cliente"
+        description="Modifica la información del cliente"
+        size="xl"
+      >
+        {selectedCliente && (
+          <ClienteForm cliente={selectedCliente} onSuccess={handleSuccess} />
+        )}
+      </Modal>
 
-      <Dialog open={showDetailModal} onOpenChange={setShowDetailModal}>
-        <DialogContent className="min-w-4xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Detalles del Cliente</DialogTitle>
-          </DialogHeader>
-          {selectedCliente && <ClienteDetalle cliente={selectedCliente} />}
-        </DialogContent>
-      </Dialog>
+      <Modal
+        open={showDetailModal}
+        onOpenChange={setShowDetailModal}
+        title="Detalles del Cliente"
+        description="Visualiza la información del cliente"
+        size="xl"
+      >
+        {selectedCliente && <ClienteDetalle cliente={selectedCliente} />}
+      </Modal>
 
-      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Esta acción desactivará permanentemente el cliente. El cliente no
-              aparecerá en las listas activas pero se mantendrá en la base de
-              datos.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete}>
+      <Modal
+        open={showDeleteDialog}
+        onOpenChange={setShowDeleteDialog}
+        title="¿Desactivar cliente?"
+        description="Esta acción desactivará el cliente. El cliente no aparecerá en las listas activas pero se mantendrá en la base de datos y podrá ser reactivado posteriormente."
+      >
+        <div className="space-y-4">
+          <div className="flex justify-end gap-2">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowDeleteDialog(false);
+                setSelectedCliente(null);
+              }}
+            >
+              Cancelar
+            </Button>
+            <Button variant="destructive" onClick={handleDelete}>
               Desactivar
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }

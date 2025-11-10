@@ -178,8 +178,8 @@ export default function SucursalesPage() {
         sucursal.provincia,
         sucursal.telefono || "",
         sucursal._count?.usuarios || 0,
-        (sucursal._count?.envios_envios_origenIdTosucursales || 0) +
-          (sucursal._count?.envios_envios_destinoIdTosucursales || 0),
+        (sucursal._count?.enviosOrigen || 0) +
+          (sucursal._count?.enviosDestino || 0),
       ]); // Crear CS V
       const csvContent = [
         headers.join(","),
@@ -214,8 +214,8 @@ export default function SucursalesPage() {
             }\\t${sucursal.telefono || ""}\\t${
               sucursal._count?.usuarios || 0
             }\\t${
-              (sucursal._count?.envios_envios_origenIdTosucursales || 0) +
-              (sucursal._count?.envios_envios_destinoIdTosucursales || 0)
+              (sucursal._count?.enviosOrigen || 0) +
+              (sucursal._count?.enviosDestino || 0)
             }`
         )
         .join("\\n");
@@ -363,9 +363,9 @@ export default function SucursalesPage() {
                             </p>
                             <p className="text-sm text-muted-foreground">
                               {(sucursal._count
-                                ?.envios_envios_origenIdTosucursales || 0) +
+                                ?.enviosOrigen || 0) +
                                 (sucursal._count
-                                  ?.envios_envios_destinoIdTosucursales || 0)}
+                                  ?.enviosDestino || 0)}
                               envíos
                             </p>
                           </div>
@@ -478,9 +478,9 @@ export default function SucursalesPage() {
                         <TableCell>
                           <Badge variant="secondary">
                             {(sucursal._count
-                              ?.envios_envios_origenIdTosucursales || 0) +
+                              ?.enviosOrigen || 0) +
                               (sucursal._count
-                                ?.envios_envios_destinoIdTosucursales || 0)}
+                                ?.enviosDestino || 0)}
                             envíos
                           </Badge>
                         </TableCell>

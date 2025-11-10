@@ -45,6 +45,7 @@ import {
   Loader2,
   Search,
   Filter,
+  RotateCcw,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useSession } from "next-auth/react";
@@ -53,8 +54,10 @@ import {
   createUsuario,
   updateUsuario,
   deleteUsuario,
+  reactivateUsuario,
 } from "@/lib/actions/usuarios";
 import { getSucursales } from "@/lib/actions/sucursales";
+import { useDebounce } from "@/hooks/useDebounce";
 
 const ROLES = [
   {
@@ -86,8 +89,10 @@ export default function UsuariosSucursalesClient() {
   const [usuarios, setUsuarios] = useState([]);
   const [sucursales, setSucursales] = useState([]);
   const [filtro, setFiltro] = useState("");
+  const debouncedFiltro = useDebounce(filtro, 500);
   const [filtroRol, setFiltroRol] = useState("TODOS");
   const [filtroSucursal, setFiltroSucursal] = useState("TODAS");
+  const [filtroEstado, setFiltroEstado] = useState("active"); // "active", "deleted", "all"
   const [showDialog, setShowDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [editingUsuario, setEditingUsuario] = useState(null);
@@ -105,13 +110,20 @@ export default function UsuariosSucursalesClient() {
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [filtroEstado, filtroRol, filtroSucursal, debouncedFiltro]);
 
   const loadData = async () => {
     try {
       setInitialLoading(true);
+      const searchParams = {
+        estado: filtroEstado,
+        role: filtroRol !== "TODOS" ? filtroRol : undefined,
+        sucursalId: filtroSucursal !== "TODAS" ? filtroSucursal : undefined,
+        q: debouncedFiltro || undefined,
+      };
+
       const [usuariosResult, sucursalesResult] = await Promise.all([
-        getUsuarios(),
+        getUsuarios(searchParams),
         getSucursales(),
       ]);
 
@@ -188,7 +200,21 @@ export default function UsuariosSucursalesClient() {
         handleCloseDialog();
         loadData();
       } else {
-        toast.error(result.error || "Error al procesar usuario");
+        // Si hay un usuarioEliminadoId, mostrar mensaje especial con acción
+        if (result.usuarioEliminadoId) {
+          toast.error(result.error || "Ya existe un usuario eliminado con este email", {
+            duration: 8000,
+            action: {
+              label: "Ver eliminados",
+              onClick: () => {
+                setFiltroEstado("deleted");
+                loadData();
+              },
+            },
+          });
+        } else {
+          toast.error(result.error || "Error al procesar usuario");
+        }
       }
     } catch (error) {
       toast.error("Error al procesar usuario");
@@ -218,16 +244,47 @@ export default function UsuariosSucursalesClient() {
     }
   };
 
-  const filteredUsuarios = usuarios.filter((usuario) => {
-    const matchesFiltro =
-      usuario.name?.toLowerCase().includes(filtro.toLowerCase()) ||
-      usuario.email?.toLowerCase().includes(filtro.toLowerCase());
-    const matchesRol = filtroRol === "TODOS" || usuario.role === filtroRol;
-    const matchesSucursal =
-      filtroSucursal === "TODAS" || usuario.sucursalId === filtroSucursal;
+  const handleReactivate = async (usuario) => {
+    if (!usuario) return;
 
-    return matchesFiltro && matchesRol && matchesSucursal;
-  });
+    setLoading(true);
+    try {
+      const result = await reactivateUsuario(usuario.id);
+      if (result.success) {
+        toast.success("Usuario restaurado correctamente");
+        
+        // Si el filtro actual es "deleted", remover el usuario de la lista
+        if (filtroEstado === "deleted") {
+          setUsuarios((prevUsuarios) =>
+            prevUsuarios.filter((u) => u.id !== usuario.id)
+          );
+        } else {
+          // Si no es el filtro de eliminados, actualizar el estado local
+          setUsuarios((prevUsuarios) =>
+            prevUsuarios.map((u) =>
+              u.id === usuario.id ? { ...u, deletedAt: null } : u
+            )
+          );
+        }
+
+        // Si se restauró desde la vista de eliminados, cambiar a vista de activos
+        if (filtroEstado === "deleted") {
+          setFiltroEstado("active");
+        }
+        
+        loadData();
+      } else {
+        toast.error(result.error || "Error al restaurar usuario");
+      }
+    } catch (error) {
+      toast.error("Error al restaurar usuario");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Los filtros se aplican en el servidor, no necesitamos filtrar localmente
+  const filteredUsuarios = usuarios;
 
   const getRoleLabel = (role) => {
     const roleObj = ROLES.find((r) => r.value === role);
@@ -253,6 +310,19 @@ export default function UsuariosSucursalesClient() {
     }
   };
 
+  const getEstadoBadge = (usuario) => {
+    if (usuario.deletedAt) {
+      return (
+        <Badge variant="outline" className="text-amber-600 border-amber-600">
+          Eliminado el {new Date(usuario.deletedAt).toLocaleDateString("es-PE")}
+        </Badge>
+      );
+    }
+    return null;
+  };
+
+  const isDeletedView = filtroEstado === "deleted";
+
   if (initialLoading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -277,6 +347,9 @@ export default function UsuariosSucursalesClient() {
             {session?.user?.role === "SUPER_ADMIN"
               ? "Administra todos los usuarios del sistema"
               : "Administra los usuarios de tu sucursal"}
+            {filtro && (
+              <span className="ml-2 text-green-600">• Búsqueda: "{filtro}"</span>
+            )}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -299,6 +372,18 @@ export default function UsuariosSucursalesClient() {
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-2">
                 <Filter className="h-4 w-4 text-muted-foreground" />
+                <Select value={filtroEstado} onValueChange={setFiltroEstado}>
+                  <SelectTrigger className="w-48">
+                    <SelectValue placeholder="Filtrar por estado" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="active">Solo activos</SelectItem>
+                    <SelectItem value="deleted">Solo eliminados</SelectItem>
+                    <SelectItem value="all">Todos</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex items-center gap-2">
                 <Select value={filtroRol} onValueChange={setFiltroRol}>
                   <SelectTrigger className="w-48">
                     <SelectValue placeholder="Filtrar por rol" />
@@ -338,6 +423,19 @@ export default function UsuariosSucursalesClient() {
 
       {/* Tabla de Usuarios */}
       <Card>
+        <CardHeader>
+          <CardTitle>
+            {isDeletedView ? "Usuarios Eliminados" : "Lista de Usuarios"}
+          </CardTitle>
+          <CardDescription>
+            {isDeletedView && (
+              <span className="text-amber-600 font-medium mb-2 block">
+                Estos usuarios han sido eliminados. Puedes restaurarlos haciendo clic en "Restaurar".
+              </span>
+            )}
+            {filteredUsuarios.length} usuario(s) encontrado(s)
+          </CardDescription>
+        </CardHeader>
         <CardContent className="p-0">
           <Table>
             <TableHeader>
@@ -347,71 +445,102 @@ export default function UsuariosSucursalesClient() {
                 <TableHead>Rol</TableHead>
                 <TableHead>Sucursal</TableHead>
                 <TableHead>Teléfono</TableHead>
+                <TableHead>Estado</TableHead>
                 <TableHead className="text-right">Acciones</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredUsuarios.map((usuario) => (
-                <TableRow key={usuario.id}>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
-                        <Users className="h-4 w-4" />
-                      </div>
-                      <div>
-                        <div className="font-medium">{usuario.name}</div>
-                        <div className="text-sm text-muted-foreground">
-                          ID: {usuario.id.slice(0, 8)}...
-                        </div>
-                      </div>
-                    </div>
-                  </TableCell>
-                  <TableCell>{usuario.email}</TableCell>
-                  <TableCell>
-                    <Badge variant={getRoleBadgeVariant(usuario.role)}>
-                      {getRoleLabel(usuario.role)}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    {usuario.sucursales ? (
-                      <div className="flex items-center gap-1">
-                        <Building2 className="h-4 w-4 text-muted-foreground" />
-                        <span>{usuario.sucursales.nombre}</span>
-                      </div>
-                    ) : (
-                      <span className="text-muted-foreground">Sin asignar</span>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    {usuario.phone || (
-                      <span className="text-muted-foreground">
-                        No registrado
-                      </span>
-                    )}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex items-center justify-end gap-2">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleOpenDialog(usuario)}
-                      >
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => {
-                          setDeletingUsuario(usuario);
-                          setShowDeleteDialog(true);
-                        }}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+              {filteredUsuarios.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={7} className="text-center py-8">
+                    <div className="text-muted-foreground">
+                      {isDeletedView
+                        ? "No hay usuarios eliminados"
+                        : "No se encontraron usuarios"}
                     </div>
                   </TableCell>
                 </TableRow>
-              ))}
+              ) : (
+                filteredUsuarios.map((usuario) => (
+                  <TableRow key={usuario.id}>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
+                          <Users className="h-4 w-4" />
+                        </div>
+                        <div>
+                          <div className="font-medium">{usuario.name}</div>
+                          <div className="text-sm text-muted-foreground">
+                            ID: {usuario.id.slice(0, 8)}...
+                          </div>
+                        </div>
+                      </div>
+                    </TableCell>
+                    <TableCell>{usuario.email}</TableCell>
+                    <TableCell>
+                      <Badge variant={getRoleBadgeVariant(usuario.role)}>
+                        {getRoleLabel(usuario.role)}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      {usuario.sucursales ? (
+                        <div className="flex items-center gap-1">
+                          <Building2 className="h-4 w-4 text-muted-foreground" />
+                          <span>{usuario.sucursales.nombre}</span>
+                        </div>
+                      ) : (
+                        <span className="text-muted-foreground">Sin asignar</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {usuario.phone || (
+                        <span className="text-muted-foreground">
+                          No registrado
+                        </span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {getEstadoBadge(usuario) || (
+                        <Badge variant="default">Activo</Badge>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex items-center justify-end gap-2">
+                        {usuario.deletedAt ? (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleReactivate(usuario)}
+                            className="text-green-600 hover:text-green-700"
+                          >
+                            <RotateCcw className="h-4 w-4" />
+                          </Button>
+                        ) : (
+                          <>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleOpenDialog(usuario)}
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                setDeletingUsuario(usuario);
+                                setShowDeleteDialog(true);
+                              }}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </>
+                        )}
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
             </TableBody>
           </Table>
         </CardContent>
@@ -573,9 +702,10 @@ export default function UsuariosSucursalesClient() {
           <DialogHeader>
             <DialogTitle>Confirmar Eliminación</DialogTitle>
             <DialogDescription>
-              ¿Estás seguro de que deseas eliminar al usuario
-              <strong>{deletingUsuario?.name}</strong>? Esta acción no se puede
-              deshacer.
+              ¿Estás seguro de que deseas eliminar al usuario{" "}
+              <strong>{deletingUsuario?.name}</strong>? El usuario será
+              eliminado pero podrás restaurarlo desde la sección de usuarios
+              eliminados.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>

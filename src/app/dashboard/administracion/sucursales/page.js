@@ -9,12 +9,16 @@ import {
 } from "@/components/ui/card";
 import { getSucursalesConEstadisticas } from "@/lib/actions/sucursales-admin";
 import SucursalesAdminClient from "@/components/administracion/sucursales-admin-client";
+import RouteProtectionServer from "@/components/auth/route-protection-server";
+
 export default async function AdministracionSucursalesPage() {
-  // Obtener sucursales con estadística s
+  // Obtener sucursales con estadísticas
   const sucursalesResult = await getSucursalesConEstadisticas();
   const sucursales = sucursalesResult.success ? sucursalesResult.data : [];
+  
   return (
-    <div className="space-y-6">
+    <RouteProtectionServer allowedRoles="SUPER_ADMIN">
+      <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight flex items-center gap-3">
@@ -84,6 +88,7 @@ export default async function AdministracionSucursalesPage() {
       </div>
       {/* Lista de Sucursales */}
       <SucursalesAdminClient initialSucursales={sucursales} />
-    </div>
+      </div>
+    </RouteProtectionServer>
   );
 }

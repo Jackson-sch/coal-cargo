@@ -1,4 +1,4 @@
-import { getClienteHistorial, getClientesSimple } from "@/lib/actions/clientes";
+import { getClienteHistorial } from "@/lib/actions/clientes";
 import ClienteHistorialClient from "@/components/clientes/cliente-historial-client";
 import ClienteSelector from "@/components/clientes/cliente-selector";
 
@@ -18,14 +18,8 @@ export default async function ClienteHistorialPage({ searchParams }) {
 
   // Si no hay clienteId, mostrar selector de cliente
   if (!clienteId) {
-    const clientesResult = await getClientesSimple();
-    if (!clientesResult.success) {
-      throw new Error(clientesResult.error);
-    }
-
     return (
       <ClienteSelector
-        clientes={clientesResult.data}
         title="Historial de Clientes"
         description="Selecciona un cliente para ver su historial completo de actividades"
       />
@@ -52,7 +46,16 @@ export default async function ClienteHistorialPage({ searchParams }) {
       cliente={result.cliente}
       totalPages={result.totalPages}
       currentPage={result.currentPage}
+      totalItems={result.total}
       total={result.total}
+      estadisticas={result.estadisticas}
+      initialFiltros={{
+        tipo,
+        estado,
+        fechaDesde,
+        fechaHasta,
+        busqueda,
+      }}
       searchParams={resolvedSearchParams}
     />
   );

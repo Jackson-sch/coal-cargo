@@ -1,4 +1,4 @@
-import { getClientes } from "@/lib/actions/clientes";
+import { getClientes, getEstadisticasClientes } from "@/lib/actions/clientes";
 import ClientesClient from "@/components/clientes/clientes-client";
 
 export default async function ClientesPage({ searchParams }) {
@@ -33,11 +33,19 @@ export default async function ClientesPage({ searchParams }) {
 
   // Si no hay parámetro de estado, getClientes mostrará solo activos por defecto
 
-  // Obtener datos del servidor
-  const result = await getClientes(params);
+  // Obtener datos del servidor y estadísticas en paralelo
+  const [result, estadisticasResult] = await Promise.all([
+    getClientes(params),
+    getEstadisticasClientes(),
+  ]);
+
   if (!result.success) {
     throw new Error(result.error || "Error al cargar clientes");
   }
+
+  const estadisticas = estadisticasResult.success
+    ? estadisticasResult.data
+    : null;
 
   return (
     <ClientesClient
@@ -46,6 +54,7 @@ export default async function ClientesPage({ searchParams }) {
       totalClientes={result.total}
       currentPage={params.page}
       searchParams={resolvedSearchParams}
+      estadisticas={estadisticas}
     />
   );
 }

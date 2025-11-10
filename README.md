@@ -37,6 +37,15 @@ npm install
 cp .env.example .env.local
 ```
 
+   Variables de entorno importantes:
+   - `RESEND_API_KEY`: Tu API key de Resend (obténla en https://resend.com/api-keys)
+   - `EMAIL_FROM`: Email remitente (debe ser de un dominio verificado en Resend)
+   
+   **⚠️ Importante sobre EMAIL_FROM:**
+   - No puedes usar dominios públicos como gmail.com, yahoo.com, etc.
+   - Debes verificar tu propio dominio en https://resend.com/domains
+   - Para desarrollo/pruebas, puedes usar: `onboarding@resend.dev` (dominio de prueba de Resend)
+
 4. Configura la base de datos:
 ```bash
 npx prisma migrate dev

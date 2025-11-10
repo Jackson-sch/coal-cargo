@@ -13,6 +13,7 @@ import { Input } from "../ui/input";
 import { Button } from "../ui/button";
 import { Loader2 } from "lucide-react";
 import { FileUpload } from "../ui/file-upload";
+import { ESTADOS_ENVIO_VALIDOS } from "@/lib/constants/estados";
 
 export default function ModalActualizarEstado({
   open,
@@ -53,13 +54,15 @@ export default function ModalActualizarEstado({
                 <SelectValue placeholder="Seleccionar estado" />
               </SelectTrigger>
               <SelectContent>
-                {estadosEnvio.map((estado) => (
-                  <SelectItem key={estado.value} value={estado.value}>
-                    <div className="flex items-center gap-2">
-                      <estado.icon className="h-4 w-4" /> {estado.label}
-                    </div>
-                  </SelectItem>
-                ))}
+                {estadosEnvio
+                  .filter((estado) => ESTADOS_ENVIO_VALIDOS.includes(estado.value))
+                  .map((estado) => (
+                    <SelectItem key={estado.value} value={estado.value}>
+                      <div className="flex items-center gap-2">
+                        <estado.icon className="h-4 w-4" /> {estado.label}
+                      </div>
+                    </SelectItem>
+                  ))}
               </SelectContent>
             </Select>
           </div>

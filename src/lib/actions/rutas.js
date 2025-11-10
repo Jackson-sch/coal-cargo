@@ -1,13 +1,47 @@
 "use server";
 
 import { prisma } from "@/lib/prisma";
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
+import {
+  RutaCreateSchema,
+  RutaUpdateSchema,
+  RutaSearchSchema,
+} from "@/lib/validaciones-zod";
+import { auth } from "@/lib/auth";
+import { handleServerActionError, logError } from "@/lib/utils/error-handler";
+import { CACHE_TAGS, cacheEstadisticas } from "@/lib/utils/cache";
+
+// Función auxiliar para verificar permisos
+async function checkPermissions(requiredRoles = []) {
+  const session = await auth();
+  if (!session?.user) {
+    throw new Error("No autorizado");
+  }
+
+  if (requiredRoles.length > 0 && !requiredRoles.includes(session.user.role)) {
+    throw new Error("Permisos insuficientes");
+  }
+
+  return session.user;
+}
 
 /**
  * Obtener todas las rutas con filtros
  */
 export async function getRutas(filtros = {}) {
   try {
+    const session = await auth();
+    
+    // Verificar permisos (permitir a todos los roles autenticados para ver)
+    if (!session?.user) {
+      return {
+        success: false,
+        error: "No autorizado",
+      };
+    }
+
+    const user = session.user;
+
     const {
       search,
       tipo,
@@ -23,20 +57,22 @@ export async function getRutas(filtros = {}) {
       deletedAt: null,
     };
 
-    // Filtro de búsqueda
-    if (search) {
+    // Filtro automático por sucursal para ADMIN_SUCURSAL
+    if (user.role === "ADMIN_SUCURSAL" && user.sucursalId) {
+      // ADMIN_SUCURSAL solo puede ver rutas que involucren su sucursal
       whereConditions.OR = [
-        { nombre: { contains: search, mode: "insensitive" } },
-        { codigo: { contains: search, mode: "insensitive" } },
-        {
-          sucursalOrigen: { nombre: { contains: search, mode: "insensitive" } },
-        },
-        {
-          sucursalDestino: {
-            nombre: { contains: search, mode: "insensitive" },
-          },
-        },
+        { sucursalOrigenId: user.sucursalId },
+        { sucursalDestinoId: user.sucursalId },
       ];
+    } else if (user.role === "SUPER_ADMIN") {
+      // SUPER_ADMIN puede filtrar por sucursal si lo especifica
+      if (sucursalOrigenId && sucursalOrigenId !== "todos") {
+        whereConditions.sucursalOrigenId = sucursalOrigenId;
+      }
+
+      if (sucursalDestinoId && sucursalDestinoId !== "todos") {
+        whereConditions.sucursalDestinoId = sucursalDestinoId;
+      }
     }
 
     // Filtros específicos
@@ -56,12 +92,31 @@ export async function getRutas(filtros = {}) {
       }
     }
 
-    if (sucursalOrigenId && sucursalOrigenId !== "todos") {
-      whereConditions.sucursalOrigenId = sucursalOrigenId;
-    }
+    // Filtro de búsqueda (combinar con filtros existentes)
+    if (search) {
+      const searchConditions = [
+        { nombre: { contains: search, mode: "insensitive" } },
+        { codigo: { contains: search, mode: "insensitive" } },
+        {
+          sucursalOrigen: { nombre: { contains: search, mode: "insensitive" } },
+        },
+        {
+          sucursalDestino: {
+            nombre: { contains: search, mode: "insensitive" },
+          },
+        },
+      ];
 
-    if (sucursalDestinoId && sucursalDestinoId !== "todos") {
-      whereConditions.sucursalDestinoId = sucursalDestinoId;
+      // Si ya hay un OR (filtro de sucursal), usar AND
+      if (whereConditions.OR) {
+        whereConditions.AND = [
+          { OR: whereConditions.OR },
+          { OR: searchConditions },
+        ];
+        delete whereConditions.OR;
+      } else {
+        whereConditions.OR = searchConditions;
+      }
     }
 
     // Calcular offset para paginación
@@ -106,10 +161,8 @@ export async function getRutas(filtros = {}) {
       },
     };
   } catch (error) {
-    return {
-      success: false,
-      error: "Error interno del servidor",
-    };
+    logError(error, { context: "getRutas", filtros });
+    return handleServerActionError(error);
   }
 }
 
@@ -153,35 +206,39 @@ export async function getRutaById(id) {
       data: ruta,
     };
   } catch (error) {
-    return {
-      success: false,
-      error: "Error interno del servidor",
-    };
+    logError(error, { context: "getRutaById", id });
+    return handleServerActionError(error);
   }
 }
 
 /**
  * Crear una nueva ruta
  */
-export async function createRuta(data) {
+export async function createRuta(formData) {
   try {
-    // Validar datos requeridos
-    if (
-      !data.nombre ||
-      !data.codigo ||
-      !data.sucursalOrigenId ||
-      !data.sucursalDestinoId
-    ) {
-      return {
-        success: false,
-        error: "Faltan campos obligatorios",
-      };
+    const user = await checkPermissions(["SUPER_ADMIN", "ADMIN_SUCURSAL"]);
+
+    // Validar datos con Zod
+    const validatedData = RutaCreateSchema.parse(formData);
+
+    // Si es ADMIN_SUCURSAL, validar que la ruta involucre su sucursal
+    if (user.role === "ADMIN_SUCURSAL" && user.sucursalId) {
+      const involucraSuSucursal =
+        validatedData.sucursalOrigenId === user.sucursalId ||
+        validatedData.sucursalDestinoId === user.sucursalId;
+
+      if (!involucraSuSucursal) {
+        return {
+          success: false,
+          error: "La ruta debe involucrar tu sucursal como origen o destino",
+        };
+      }
     }
 
     // Verificar que el código no exista
     const existingRuta = await prisma.rutas.findFirst({
       where: {
-        codigo: data.codigo,
+        codigo: validatedData.codigo,
         deletedAt: null,
       },
     });
@@ -190,40 +247,43 @@ export async function createRuta(data) {
       return {
         success: false,
         error: "Ya existe una ruta con este código",
+        field: "codigo",
       };
     }
 
     // Calcular costo total
-    const costoBase = parseFloat(data.costoBase) || 0;
-    const costoPeajes = parseFloat(data.costoPeajes) || 0;
-    const costoCombustible = parseFloat(data.costoCombustible) || 0;
-    const costoTotal = costoBase + costoPeajes + costoCombustible;
+    const costoTotal =
+      validatedData.costoBase +
+      validatedData.costoPeajes +
+      validatedData.costoCombustible;
 
     // Preparar datos para crear
     const rutaData = {
-      nombre: data.nombre,
-      codigo: data.codigo,
-      descripcion: data.descripcion || null,
-      tipo: data.tipo?.toUpperCase() || "URBANA",
-      sucursalOrigenId: data.sucursalOrigenId,
-      sucursalDestinoId: data.sucursalDestinoId,
-      distancia: data.distancia ? parseFloat(data.distancia) : null,
-      tiempoEstimado: data.tiempoEstimado
-        ? parseInt(data.tiempoEstimado)
-        : null,
-      costoBase,
-      costoPeajes,
-      costoCombustible,
+      nombre: validatedData.nombre,
+      codigo: validatedData.codigo,
+      descripcion: validatedData.descripcion || null,
+      tipo: validatedData.tipo,
+      estado: validatedData.estado || "PROGRAMADA",
+      activo: validatedData.activo !== undefined ? validatedData.activo : true,
+      sucursalOrigenId: validatedData.sucursalOrigenId,
+      sucursalDestinoId: validatedData.sucursalDestinoId,
+      distancia: validatedData.distancia || null,
+      tiempoEstimado: validatedData.tiempoEstimado || null,
+      costoBase: validatedData.costoBase,
+      costoPeajes: validatedData.costoPeajes,
+      costoCombustible: validatedData.costoCombustible,
       costoTotal,
-      tipoVehiculo: data.tipoVehiculo?.toUpperCase() || null,
-      capacidadMaxima: data.capacidadMaxima
-        ? parseFloat(data.capacidadMaxima)
-        : null,
-      paradas: data.paradas && data.paradas.length > 0 ? data.paradas : null,
+      tipoVehiculo: validatedData.tipoVehiculo || null,
+      capacidadMaxima: validatedData.capacidadMaxima || null,
+      paradas:
+        validatedData.paradas && validatedData.paradas.length > 0
+          ? validatedData.paradas
+          : null,
       horarios:
-        data.horarios && data.horarios.length > 0 ? data.horarios : null,
-      observaciones: data.observaciones || null,
-      activo: data.activo !== undefined ? data.activo : true,
+        validatedData.horarios && validatedData.horarios.length > 0
+          ? validatedData.horarios
+          : null,
+      observaciones: validatedData.observaciones || null,
     };
 
     const ruta = await prisma.rutas.create({
@@ -234,6 +294,7 @@ export async function createRuta(data) {
             id: true,
             nombre: true,
             direccion: true,
+            provincia: true,
           },
         },
         sucursalDestino: {
@@ -241,12 +302,16 @@ export async function createRuta(data) {
             id: true,
             nombre: true,
             direccion: true,
+            provincia: true,
           },
         },
       },
     });
 
     revalidatePath("/dashboard/rutas");
+    // Invalidar cache relacionado
+    revalidateTag(CACHE_TAGS.RUTAS);
+    revalidateTag(CACHE_TAGS.ESTADISTICAS);
 
     return {
       success: true,
@@ -254,24 +319,25 @@ export async function createRuta(data) {
       message: "Ruta creada correctamente",
     };
   } catch (error) {
-    return {
-      success: false,
-      error: "Error interno del servidor",
-    };
+    logError(error, { context: "createRuta", formData });
+    return handleServerActionError(error);
   }
 }
 
 /**
  * Actualizar una ruta
  */
-export async function updateRuta(id, data) {
+export async function updateRuta(id, formData) {
   try {
+    const user = await checkPermissions(["SUPER_ADMIN", "ADMIN_SUCURSAL"]);
+
     // Verificar que la ruta existe
     const existingRuta = await prisma.rutas.findFirst({
       where: {
         id,
         deletedAt: null,
       },
+      select: { sucursalOrigenId: true, sucursalDestinoId: true },
     });
 
     if (!existingRuta) {
@@ -281,11 +347,46 @@ export async function updateRuta(id, data) {
       };
     }
 
+    // Si es ADMIN_SUCURSAL, validar que la ruta involucre su sucursal
+    if (user.role === "ADMIN_SUCURSAL" && user.sucursalId) {
+      const involucraSuSucursal =
+        existingRuta.sucursalOrigenId === user.sucursalId ||
+        existingRuta.sucursalDestinoId === user.sucursalId;
+
+      if (!involucraSuSucursal) {
+        return {
+          success: false,
+          error: "No tienes permisos para modificar esta ruta",
+        };
+      }
+
+      // Validar que la ruta actualizada también involucre su sucursal
+      if (formData.sucursalOrigenId || formData.sucursalDestinoId) {
+        const nuevaInvolucraSuSucursal =
+          (formData.sucursalOrigenId || existingRuta.sucursalOrigenId) === user.sucursalId ||
+          (formData.sucursalDestinoId || existingRuta.sucursalDestinoId) === user.sucursalId;
+
+        if (!nuevaInvolucraSuSucursal) {
+          return {
+            success: false,
+            error: "La ruta debe involucrar tu sucursal como origen o destino",
+          };
+        }
+      }
+    }
+
+    // Validar datos con Zod (solo los campos proporcionados)
+    const cleanData = Object.fromEntries(
+      Object.entries(formData).filter(([_, value]) => value !== undefined && value !== "")
+    );
+
+    const validatedData = RutaUpdateSchema.parse(cleanData);
+
     // Verificar código único (excluyendo la ruta actual)
-    if (data.codigo && data.codigo !== existingRuta.codigo) {
+    if (validatedData.codigo && validatedData.codigo !== existingRuta.codigo) {
       const duplicateRuta = await prisma.rutas.findFirst({
         where: {
-          codigo: data.codigo,
+          codigo: validatedData.codigo,
           id: { not: id },
           deletedAt: null,
         },
@@ -295,85 +396,64 @@ export async function updateRuta(id, data) {
         return {
           success: false,
           error: "Ya existe una ruta con este código",
+          field: "codigo",
         };
       }
     }
 
-    // Calcular costo total si se proporcionan costos
-    let costoTotal = existingRuta.costoTotal;
-    if (
-      data.costoBase !== undefined ||
-      data.costoPeajes !== undefined ||
-      data.costoCombustible !== undefined
-    ) {
-      const costoBase =
-        data.costoBase !== undefined
-          ? parseFloat(data.costoBase)
-          : existingRuta.costoBase;
-      const costoPeajes =
-        data.costoPeajes !== undefined
-          ? parseFloat(data.costoPeajes)
-          : existingRuta.costoPeajes;
-      const costoCombustible =
-        data.costoCombustible !== undefined
-          ? parseFloat(data.costoCombustible)
-          : existingRuta.costoCombustible;
-
-      costoTotal = costoBase + costoPeajes + costoCombustible;
-    }
+    // Calcular costo total
+    const costoBase = validatedData.costoBase !== undefined 
+      ? validatedData.costoBase 
+      : existingRuta.costoBase;
+    const costoPeajes = validatedData.costoPeajes !== undefined 
+      ? validatedData.costoPeajes 
+      : existingRuta.costoPeajes;
+    const costoCombustible = validatedData.costoCombustible !== undefined 
+      ? validatedData.costoCombustible 
+      : existingRuta.costoCombustible;
+    const costoTotal = costoBase + costoPeajes + costoCombustible;
 
     // Preparar datos para actualizar
     const updateData = {
-      ...(data.nombre && { nombre: data.nombre }),
-      ...(data.codigo && { codigo: data.codigo }),
-      ...(data.descripcion !== undefined && {
-        descripcion: data.descripcion,
+      ...(validatedData.nombre && { nombre: validatedData.nombre }),
+      ...(validatedData.codigo && { codigo: validatedData.codigo }),
+      ...(validatedData.descripcion !== undefined && {
+        descripcion: validatedData.descripcion,
       }),
-      ...(data.tipo && { tipo: data.tipo.toUpperCase() }),
-      ...(data.sucursalOrigenId && {
-        sucursalOrigenId: data.sucursalOrigenId,
+      ...(validatedData.tipo && { tipo: validatedData.tipo }),
+      ...(validatedData.estado && { estado: validatedData.estado }),
+      ...(validatedData.sucursalOrigenId && {
+        sucursalOrigenId: validatedData.sucursalOrigenId,
       }),
-      ...(data.sucursalDestinoId && {
-        sucursalDestinoId: data.sucursalDestinoId,
+      ...(validatedData.sucursalDestinoId && {
+        sucursalDestinoId: validatedData.sucursalDestinoId,
       }),
-      ...(data.distancia !== undefined && {
-        distancia: data.distancia ? parseFloat(data.distancia) : null,
+      ...(validatedData.distancia !== undefined && {
+        distancia: validatedData.distancia,
       }),
-      ...(data.tiempoEstimado !== undefined && {
-        tiempoEstimado: data.tiempoEstimado
-          ? parseInt(data.tiempoEstimado)
-          : null,
+      ...(validatedData.tiempoEstimado !== undefined && {
+        tiempoEstimado: validatedData.tiempoEstimado,
       }),
-      ...(data.costoBase !== undefined && {
-        costoBase: parseFloat(data.costoBase) || 0,
-      }),
-      ...(data.costoPeajes !== undefined && {
-        costoPeajes: parseFloat(data.costoPeajes) || 0,
-      }),
-      ...(data.costoCombustible !== undefined && {
-        costoCombustible: parseFloat(data.costoCombustible) || 0,
-      }),
+      costoBase,
+      costoPeajes,
+      costoCombustible,
       costoTotal,
-      ...(data.tipoVehiculo !== undefined && {
-        tipoVehiculo: data.tipoVehiculo?.toUpperCase() || null,
+      ...(validatedData.tipoVehiculo !== undefined && {
+        tipoVehiculo: validatedData.tipoVehiculo,
       }),
-      ...(data.capacidadMaxima !== undefined && {
-        capacidadMaxima: data.capacidadMaxima
-          ? parseFloat(data.capacidadMaxima)
-          : null,
+      ...(validatedData.capacidadMaxima !== undefined && {
+        capacidadMaxima: validatedData.capacidadMaxima,
       }),
-      ...(data.paradas !== undefined && {
-        paradas: data.paradas && data.paradas.length > 0 ? data.paradas : null,
+      ...(validatedData.paradas !== undefined && {
+        paradas: validatedData.paradas,
       }),
-      ...(data.horarios !== undefined && {
-        horarios:
-          data.horarios && data.horarios.length > 0 ? data.horarios : null,
+      ...(validatedData.horarios !== undefined && {
+        horarios: validatedData.horarios,
       }),
-      ...(data.observaciones !== undefined && {
-        observaciones: data.observaciones,
+      ...(validatedData.observaciones !== undefined && {
+        observaciones: validatedData.observaciones,
       }),
-      ...(data.activo !== undefined && { activo: data.activo }),
-      updatedAt: new Date(),
+      ...(validatedData.activo !== undefined && { activo: validatedData.activo }),
     };
 
     const ruta = await prisma.rutas.update({
@@ -385,6 +465,7 @@ export async function updateRuta(id, data) {
             id: true,
             nombre: true,
             direccion: true,
+            provincia: true,
           },
         },
         sucursalDestino: {
@@ -392,12 +473,16 @@ export async function updateRuta(id, data) {
             id: true,
             nombre: true,
             direccion: true,
+            provincia: true,
           },
         },
       },
     });
 
     revalidatePath("/dashboard/rutas");
+    // Invalidar cache relacionado
+    revalidateTag(CACHE_TAGS.RUTAS);
+    revalidateTag(CACHE_TAGS.ESTADISTICAS);
 
     return {
       success: true,
@@ -405,10 +490,8 @@ export async function updateRuta(id, data) {
       message: "Ruta actualizada correctamente",
     };
   } catch (error) {
-    return {
-      success: false,
-      error: "Error interno del servidor",
-    };
+    logError(error, { context: "updateRuta", id, formData });
+    return handleServerActionError(error);
   }
 }
 
@@ -440,23 +523,24 @@ export async function deleteRuta(id) {
     });
 
     revalidatePath("/dashboard/rutas");
+    // Invalidar cache relacionado
+    revalidateTag(CACHE_TAGS.RUTAS);
+    revalidateTag(CACHE_TAGS.ESTADISTICAS);
 
     return {
       success: true,
       message: "Ruta eliminada correctamente",
     };
   } catch (error) {
-    return {
-      success: false,
-      error: "Error interno del servidor",
-    };
+    logError(error, { context: "deleteRuta", id });
+    return handleServerActionError(error);
   }
 }
 
 /**
- * Obtener estadísticas de rutas
+ * Obtener estadísticas de rutas (función interna)
  */
-export async function getEstadisticasRutas() {
+const _getEstadisticasRutas = async () => {
   try {
     const [
       totalRutas,
@@ -523,12 +607,16 @@ export async function getEstadisticasRutas() {
       },
     };
   } catch (error) {
-    return {
-      success: false,
-      error: "Error interno del servidor",
-    };
+    logError(error, { context: "getEstadisticasRutas" });
+    return handleServerActionError(error);
   }
-}
+};
+
+// Exportar versión cacheada
+export const getEstadisticasRutas = cacheEstadisticas(
+  _getEstadisticasRutas,
+  ["estadisticas-rutas"]
+);
 
 /**
  * Obtener rutas entre dos sucursales
@@ -564,10 +652,8 @@ export async function getRutasEntreSucursales(origenId, destinoId) {
       data: rutas,
     };
   } catch (error) {
-    return {
-      success: false,
-      error: "Error interno del servidor",
-    };
+    logError(error, { context: "getRutas", filtros });
+    return handleServerActionError(error);
   }
 }
 
@@ -625,9 +711,7 @@ export async function optimizarRutas() {
       message: `Análisis completado. Se encontraron ${optimizaciones.length} oportunidades de optimización.`,
     };
   } catch (error) {
-    return {
-      success: false,
-      error: "Error interno del servidor",
-    };
+    logError(error, { context: "getRutas", filtros });
+    return handleServerActionError(error);
   }
 }

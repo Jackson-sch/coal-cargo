@@ -34,7 +34,20 @@ import {
 } from "@/lib/actions/configuracion";
 import { consultarRUC } from "@/lib/services/document-api";
 import { validarDocumentoPeruano } from "@/lib/utils/documentos.js";
+import RouteProtection from "@/components/auth/route-protection";
+
 export default function ConfiguracionGeneral() {
+  return (
+    <RouteProtection
+      allowedRoles="SUPER_ADMIN"
+      customMessage="Solo los Super Administradores pueden modificar la configuración general del sistema."
+    >
+      <ConfiguracionGeneralContent />
+    </RouteProtection>
+  );
+}
+
+function ConfiguracionGeneralContent() {
   const [configuracion, setConfiguracion] = useState({
     // Información de la empres a
     empresa_nombre: "",
@@ -324,7 +337,7 @@ export default function ConfiguracionGeneral() {
   }
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
+    <div className="container mx-auto space-y-6">
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-2">
           <Settings className="h-6 w-6" />

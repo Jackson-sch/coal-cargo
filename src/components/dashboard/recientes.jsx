@@ -25,7 +25,9 @@ export default function Recientes({ recientes }) {
         <CardTitle className="flex items-center gap-2">
           <Package className="h-5 w-5" /> Envíos Recientes
         </CardTitle>
-        <CardDescription>Últimos 10 envíos registrados</CardDescription>
+        <CardDescription>
+          Últimos 10 envíos (origen y destino)
+        </CardDescription>
       </CardHeader>
       <CardContent>
         {recientes.length === 0 ? (
@@ -66,7 +68,7 @@ export default function Recientes({ recientes }) {
                       {formatCurrency(e.total || 0)}
                     </TableCell>
                     <TableCell className="py-2 pl-2 whitespace-nowrap">
-                      {formatDate(e.createdAt)}
+                      {formatDate(e.fechaRegistro || e.createdAt)}
                     </TableCell>
                   </TableRow>
                 ))}

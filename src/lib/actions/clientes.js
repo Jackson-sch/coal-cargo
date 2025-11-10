@@ -24,27 +24,27 @@ async function checkPermissions(requiredRoles = []) {
   return session.user;
 }
 
+import { handleServerActionError, logError } from "@/lib/utils/error-handler";
+
 // Función auxiliar para manejar errores
 function handleActionError(error) {
+  // Usar el sistema centralizado de manejo de errores
+  const result = handleServerActionError(error);
+  
+  // Mantener compatibilidad con el formato existente
   if (error.name === "ZodError") {
+    // Extraer el primer error relevante con su mensaje
+    const firstError = error.errors?.[0];
+    const errorPath = firstError?.path?.join(".") || "";
+    
     return {
-      success: false,
-      error: "Datos inválidos",
+      ...result,
       details: error.errors,
+      field: errorPath, // Agregar el campo que falló
     };
   }
 
-  if (error instanceof Error) {
-    return {
-      success: false,
-      error: error.message,
-    };
-  }
-
-  return {
-    success: false,
-    error: "Error interno del servidor",
-  };
+  return result;
 }
 
 // Obtener lista de clientes con filtros
@@ -72,9 +72,9 @@ export async function getClientes(searchParams = {}) {
         where.estado = true;
         where.deletedAt = null;
       } else if (estado === "inactive") {
-        // Mostrar solo inactivos, excluyendo eliminados
+        // Mostrar solo inactivos (incluye los desactivados con soft delete)
         where.estado = false;
-        where.deletedAt = null;
+        // No excluimos deletedAt para incluir también los desactivados permanentemente
       } else if (estado === "deleted") {
         where.deletedAt = { not: null }; // Solo eliminados
       } else if (typeof estado === "boolean") {
@@ -217,6 +217,42 @@ export async function createCliente(formData) {
       return {
         success: false,
         error: "Ya existe un cliente activo con este número de documento",
+      };
+    }
+
+    // Verificar si existe un cliente eliminado con estos datos (para sugerir restauración)
+    const deletedCliente = await prisma.clientes.findFirst({
+      where: {
+        numeroDocumento: numeroDoc,
+        deletedAt: { not: null },
+      },
+      select: { id: true, nombre: true, apellidos: true, razonSocial: true, deletedAt: true },
+    });
+
+    // Si es RUC, también verificar por campo ruc en clientes eliminados
+    let deletedRuc = null;
+    if (tipoDoc === "RUC") {
+      deletedRuc = await prisma.clientes.findFirst({
+        where: {
+          ruc: numeroDoc,
+          deletedAt: { not: null },
+        },
+        select: { id: true, nombre: true, apellidos: true, razonSocial: true, deletedAt: true },
+      });
+    }
+
+    if (deletedCliente || deletedRuc) {
+      const clienteEliminado = deletedCliente || deletedRuc;
+      const nombreCliente = clienteEliminado.razonSocial || 
+        `${clienteEliminado.nombre} ${clienteEliminado.apellidos || ""}`.trim();
+      const fechaEliminacion = clienteEliminado.deletedAt 
+        ? new Date(clienteEliminado.deletedAt).toLocaleDateString("es-PE")
+        : "fecha desconocida";
+      
+      return {
+        success: false,
+        error: `Ya existe un cliente eliminado con este número de documento (${nombreCliente}, eliminado el ${fechaEliminacion}). Puedes restaurarlo desde la sección de clientes eliminados.`,
+        clienteEliminadoId: clienteEliminado.id,
       };
     }
 
@@ -424,13 +460,87 @@ export async function getClienteByDocumento(numeroDocumento) {
   }
 }
 
-// Obtener clientes simples (para selects)
-export async function getClientesSimple() {
+// Obtener estadísticas de clientes
+export async function getEstadisticasClientes() {
   try {
     await checkPermissions(["SUPER_ADMIN", "ADMIN_SUCURSAL", "OPERADOR"]);
 
+    // Obtener estadísticas agregadas
+    const [
+      totalClientes,
+      activos,
+      inactivos,
+      empresas,
+      personasNaturales,
+      nuevosEsteMes,
+    ] = await Promise.all([
+      // Total de clientes (no eliminados)
+      prisma.clientes.count({
+        where: { deletedAt: null },
+      }),
+      // Clientes activos
+      prisma.clientes.count({
+        where: { estado: true, deletedAt: null },
+      }),
+      // Clientes inactivos (incluye los desactivados con soft delete)
+      prisma.clientes.count({
+        where: { estado: false },
+      }),
+      // Empresas
+      prisma.clientes.count({
+        where: { esEmpresa: true, deletedAt: null },
+      }),
+      // Personas naturales
+      prisma.clientes.count({
+        where: { esEmpresa: false, deletedAt: null },
+      }),
+      // Nuevos este mes
+      prisma.clientes.count({
+        where: {
+          deletedAt: null,
+          createdAt: {
+            gte: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
+          },
+        },
+      }),
+    ]);
+
+    return {
+      success: true,
+      data: {
+        totalClientes,
+        activos,
+        inactivos,
+        empresas,
+        personasNaturales,
+        nuevosEsteMes,
+      },
+    };
+  } catch (error) {
+    return handleActionError(error);
+  }
+}
+
+// Obtener clientes simples (para selects)
+export async function getClientesSimple(searchQuery = "", limit = 50) {
+  try {
+    await checkPermissions(["SUPER_ADMIN", "ADMIN_SUCURSAL", "OPERADOR"]);
+
+    const where = { estado: true, deletedAt: null };
+
+    // Si hay búsqueda, agregar filtros
+    if (searchQuery?.trim()) {
+      const q = searchQuery.trim();
+      where.OR = [
+        { nombre: { contains: q, mode: "insensitive" } },
+        { apellidos: { contains: q, mode: "insensitive" } },
+        { razonSocial: { contains: q, mode: "insensitive" } },
+        { numeroDocumento: { contains: q } },
+      ];
+    }
+
     const clientes = await prisma.clientes.findMany({
-      where: { estado: true, deletedAt: null },
+      where,
       select: {
         id: true,
         nombre: true,
@@ -441,6 +551,7 @@ export async function getClientesSimple() {
         esEmpresa: true,
       },
       orderBy: [{ nombre: "asc" }, { apellidos: "asc" }],
+      take: limit,
     });
 
     return {
@@ -455,7 +566,7 @@ export async function getClientesSimple() {
 // Obtener historial del cliente
 export async function getClienteHistorial(searchParams = {}) {
   try {
-    await checkPermissions(["SUPER_ADMIN", "ADMIN_SUCURSAL", "OPERADOR"]);
+    const user = await checkPermissions(["SUPER_ADMIN", "ADMIN_SUCURSAL", "OPERADOR"]);
 
     const {
       clienteId,
@@ -475,6 +586,11 @@ export async function getClienteHistorial(searchParams = {}) {
       };
     }
 
+    // Log para debugging
+    console.log("🔍 getClienteHistorial - clienteId:", clienteId);
+    console.log("🔍 getClienteHistorial - filtros:", { tipo, estado, fechaDesde, fechaHasta, busqueda });
+    console.log("🔍 getClienteHistorial - usuario:", user.role, user.sucursalId);
+
     // Verificar que el cliente existe
     const cliente = await prisma.clientes.findUnique({
       where: { id: clienteId },
@@ -492,21 +608,36 @@ export async function getClienteHistorial(searchParams = {}) {
     });
 
     if (!cliente) {
+      console.log("❌ Cliente no encontrado con ID:", clienteId);
       return {
         success: false,
         error: "Cliente no encontrado",
       };
     }
 
+    console.log("✅ Cliente encontrado:", cliente.nombre, cliente.apellidos);
+
     const skip = (page - 1) * limit;
     let historialData = [];
+    
+    // Construir filtro de sucursal si el usuario no es SUPER_ADMIN
+    const sucursalFilter = user.role !== "SUPER_ADMIN" && user.sucursalId 
+      ? {
+          OR: [
+            { sucursalOrigenId: user.sucursalId },
+            { sucursalDestinoId: user.sucursalId },
+          ],
+        }
+      : null;
 
     // Construir filtros de fecha
     const fechaFilter = {};
-    if (fechaDesde) {
-      fechaFilter.gte = new Date(fechaDesde);
+    if (fechaDesde && fechaDesde.trim() !== "") {
+      const fechaDesdeDate = new Date(fechaDesde);
+      fechaDesdeDate.setHours(0, 0, 0, 0);
+      fechaFilter.gte = fechaDesdeDate;
     }
-    if (fechaHasta) {
+    if (fechaHasta && fechaHasta.trim() !== "") {
       const fechaHastaDate = new Date(fechaHasta);
       fechaHastaDate.setHours(23, 59, 59, 999);
       fechaFilter.lte = fechaHastaDate;
@@ -514,48 +645,277 @@ export async function getClienteHistorial(searchParams = {}) {
 
     // Obtener envíos si se solicita
     if (tipo === "todos" || tipo === "envios") {
-      const enviosFilter = {
+      // Construir filtro base
+      const baseFilters = {
         clienteId: clienteId,
         deletedAt: null,
       };
 
-      if (estado) {
-        enviosFilter.estado = estado;
+      // Validar que el estado sea válido para envíos
+      const estadosEnvioValidos = [
+        "REGISTRADO",
+        "EN_BODEGA",
+        "EN_TRANSITO",
+        "EN_AGENCIA_ORIGEN",
+        "EN_AGENCIA_DESTINO",
+        "EN_REPARTO",
+        "ENTREGADO",
+        "DEVUELTO",
+        "ANULADO",
+      ];
+      if (
+        estado &&
+        estado !== "todos" &&
+        estado.trim() !== "" &&
+        estadosEnvioValidos.includes(estado)
+      ) {
+        baseFilters.estado = estado;
       }
 
+      // Agregar filtro de fecha si existe
       if (Object.keys(fechaFilter).length > 0) {
-        enviosFilter.fechaRegistro = fechaFilter;
+        baseFilters.fechaRegistro = fechaFilter;
       }
 
-      if (busqueda) {
-        enviosFilter.OR = [
+      // Construir filtro final
+      let enviosFilter;
+      
+      // Si hay búsqueda
+      if (busqueda && busqueda.trim() !== "") {
+        const searchConditions = [
           { guia: { contains: busqueda, mode: "insensitive" } },
           { descripcion: { contains: busqueda, mode: "insensitive" } },
           { destinatarioNombre: { contains: busqueda, mode: "insensitive" } },
         ];
+
+        // Si hay filtro de sucursal, combinar todo con AND
+        if (sucursalFilter) {
+          enviosFilter = {
+            clienteId: baseFilters.clienteId,
+            deletedAt: baseFilters.deletedAt,
+            AND: [
+              sucursalFilter,
+              { OR: searchConditions },
+            ],
+          };
+          
+          // Agregar otras condiciones al AND si existen
+          if (baseFilters.estado) {
+            enviosFilter.AND.push({ estado: baseFilters.estado });
+          }
+          if (baseFilters.fechaRegistro) {
+            enviosFilter.AND.push({ fechaRegistro: baseFilters.fechaRegistro });
+          }
+        } else {
+          // No hay filtro de sucursal, combinar normalmente
+          enviosFilter = {
+            AND: [
+              baseFilters,
+              { OR: searchConditions }
+            ]
+          };
+        }
+      } else {
+        // Sin búsqueda
+        if (sucursalFilter) {
+          // Hay filtro de sucursal, combinarlo con AND
+          enviosFilter = {
+            clienteId: baseFilters.clienteId,
+            deletedAt: baseFilters.deletedAt,
+            AND: [sucursalFilter],
+          };
+          
+          // Agregar otras condiciones al AND si existen
+          if (baseFilters.estado) {
+            enviosFilter.AND.push({ estado: baseFilters.estado });
+          }
+          if (baseFilters.fechaRegistro) {
+            enviosFilter.AND.push({ fechaRegistro: baseFilters.fechaRegistro });
+          }
+        } else {
+          // No hay filtro de sucursal, usar filtros base directamente
+          enviosFilter = baseFilters;
+        }
       }
 
+      // Consultar envíos directamente desde la base de datos
+      console.log("🔍 Consultando envíos con filtro:", JSON.stringify(enviosFilter, null, 2));
+      
       const envios = await prisma.envios.findMany({
         where: enviosFilter,
         include: {
-          sucursalOrigen: true,
-          sucursalDestino: true,
+          sucursalOrigen: {
+            select: {
+              id: true,
+              nombre: true,
+              provincia: true,
+              direccion: true,
+            },
+          },
+          sucursalDestino: {
+            select: {
+              id: true,
+              nombre: true,
+              provincia: true,
+              direccion: true,
+            },
+          },
+          cliente: {
+            select: {
+              id: true,
+              nombre: true,
+              apellidos: true,
+              razonSocial: true,
+              numeroDocumento: true,
+            },
+          },
           eventos_envio: {
-            orderBy: { fechaEvento: "desc" },
+            orderBy: { createdAt: "desc" },
             take: 1,
           },
         },
         orderBy: { fechaRegistro: "desc" },
       });
 
+      console.log(`📦 Envíos encontrados: ${envios.length}`);
+
       const enviosHistorial = envios.map((envio) => ({
         ...envio,
         tipo: "envio",
         identificador: envio.guia,
         fechaPrincipal: envio.fechaRegistro,
+        // Mapear direcciones desde sucursales
+        direccionOrigen: envio.sucursalOrigen?.direccion || envio.sucursalOrigen?.nombre || null,
+        direccionDestino: envio.sucursalDestino?.direccion || envio.sucursalDestino?.nombre || null,
+        // Mapear nombres de sucursales para compatibilidad
+        sucursal_origen: envio.sucursalOrigen,
+        sucursal_destino: envio.sucursalDestino,
+        // Asegurar que numeroGuia esté disponible
+        numeroGuia: envio.guia,
       }));
 
       historialData = [...historialData, ...enviosHistorial];
+    }
+
+    // Obtener cotizaciones si se solicita
+    if (tipo === "todos" || tipo === "cotizaciones") {
+      let cotizacionesFilter;
+
+      // Construir filtro de búsqueda
+      if (busqueda && busqueda.trim() !== "") {
+        // Las cotizaciones no tienen guía, solo buscar en contenido y nombre
+        // Cuando hay búsqueda, Prisma requiere que todos los filtros se combinen con AND
+        const baseFilters = {
+          clienteId: clienteId,
+        };
+        
+        // Validar que el estado sea válido para cotizaciones
+        const estadosCotizacionValidos = [
+          "PENDIENTE",
+          "APROBADA",
+          "RECHAZADA",
+          "CONVERTIDA_ENVIO",
+          "EXPIRADA",
+        ];
+        if (
+          estado &&
+          estado !== "todos" &&
+          estado.trim() !== "" &&
+          estadosCotizacionValidos.includes(estado)
+        ) {
+          baseFilters.estado = estado;
+        }
+        
+        if (Object.keys(fechaFilter).length > 0) {
+          baseFilters.createdAt = fechaFilter;
+        }
+
+        const searchConditions = [
+          { contenido: { contains: busqueda, mode: "insensitive" } },
+          { nombreCliente: { contains: busqueda, mode: "insensitive" } },
+        ];
+
+        // Construir filtro con AND para combinar todos los filtros
+        cotizacionesFilter = {
+          AND: [
+            baseFilters,
+            { OR: searchConditions }
+          ]
+        };
+      } else {
+        // Sin búsqueda, usar filtros simples
+        cotizacionesFilter = {
+          clienteId: clienteId,
+        };
+
+        // Solo agregar filtro de estado si no es "todos" o está vacío
+        // Validar que el estado sea válido para cotizaciones
+        const estadosCotizacionValidos = [
+          "PENDIENTE",
+          "APROBADA",
+          "RECHAZADA",
+          "CONVERTIDA_ENVIO",
+          "EXPIRADA",
+        ];
+        if (
+          estado &&
+          estado !== "todos" &&
+          estado.trim() !== "" &&
+          estadosCotizacionValidos.includes(estado)
+        ) {
+          cotizacionesFilter.estado = estado;
+        }
+
+        // Agregar filtro de fecha si existe
+        if (Object.keys(fechaFilter).length > 0) {
+          cotizacionesFilter.createdAt = fechaFilter;
+        }
+      }
+
+      // Consultar cotizaciones directamente desde la base de datos
+      console.log("🔍 Consultando cotizaciones con filtro:", JSON.stringify(cotizacionesFilter, null, 2));
+      
+      const cotizaciones = await prisma.cotizaciones.findMany({
+        where: cotizacionesFilter,
+        include: {
+          sucursalOrigen: {
+            select: {
+              id: true,
+              nombre: true,
+              provincia: true,
+            },
+          },
+          sucursalDestino: {
+            select: {
+              id: true,
+              nombre: true,
+              provincia: true,
+            },
+          },
+          cliente: {
+            select: {
+              id: true,
+              nombre: true,
+              apellidos: true,
+              razonSocial: true,
+              numeroDocumento: true,
+            },
+          },
+        },
+        orderBy: { createdAt: "desc" },
+      });
+
+      console.log(`📋 Cotizaciones encontradas: ${cotizaciones.length}`);
+
+      const cotizacionesHistorial = cotizaciones.map((cotizacion) => ({
+        ...cotizacion,
+        tipo: "cotizacion",
+        identificador: cotizacion.id,
+        fechaPrincipal: cotizacion.createdAt,
+        total: cotizacion.precioFinal || 0,
+      }));
+
+      historialData = [...historialData, ...cotizacionesHistorial];
     }
 
     // Ordenar todo el historial por fecha
@@ -563,10 +923,28 @@ export async function getClienteHistorial(searchParams = {}) {
       (a, b) => new Date(b.fechaPrincipal) - new Date(a.fechaPrincipal)
     );
 
+    // Calcular estadísticas con TODOS los datos (sin paginación)
+    const estadisticas = {
+      totalEnvios: historialData.filter((item) => item.tipo === "envio").length,
+      totalCotizaciones: historialData.filter((item) => item.tipo === "cotizacion").length,
+      enviosEntregados: historialData.filter(
+        (item) => item.tipo === "envio" && item.estado === "ENTREGADO"
+      ).length,
+      montoTotal: historialData.reduce(
+        (sum, item) => sum + (item.total || item.precioFinal || 0),
+        0
+      ),
+    };
+
+    console.log(`📊 Estadísticas calculadas:`, estadisticas);
+    console.log(`📊 Total items en historial: ${historialData.length}`);
+
     // Aplicar paginación
     const totalItems = historialData.length;
     const totalPages = Math.ceil(totalItems / limit);
     const paginatedData = historialData.slice(skip, skip + limit);
+
+    console.log(`📄 Datos paginados: ${paginatedData.length} de ${totalItems}`);
 
     return {
       success: true,
@@ -574,6 +952,7 @@ export async function getClienteHistorial(searchParams = {}) {
       total: totalItems,
       totalPages,
       currentPage: page,
+      estadisticas, // Devolver estadísticas calculadas con todos los datos
       cliente: {
         id: cliente.id,
         nombre: cliente.nombre,
@@ -713,8 +1092,9 @@ export async function reactivateCliente(id) {
   try {
     await checkPermissions(["SUPER_ADMIN", "ADMIN_SUCURSAL"]);
 
+    // Buscar el cliente sin importar si tiene deletedAt o no
     const existingCliente = await prisma.clientes.findUnique({
-      where: { id, deletedAt: null },
+      where: { id },
     });
 
     if (!existingCliente) {
@@ -724,10 +1104,12 @@ export async function reactivateCliente(id) {
       };
     }
 
+    // Reactivar: limpiar deletedAt y activar estado
     const updatedCliente = await prisma.clientes.update({
       where: { id },
       data: {
         estado: true,
+        deletedAt: null, // Limpiar el soft delete
       },
     });
 

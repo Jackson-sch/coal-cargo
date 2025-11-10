@@ -3,6 +3,8 @@
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
 import { SeguimientoPublicoSchema } from "@/lib/validaciones-zod";
+import { procesarNotificacion } from "@/lib/services/notificaciones/notificacion-service";
+import { crearNotificacionAutomatica } from "@/lib/utils/crear-notificacion-automatica";
 
 // Función auxiliar para verificar permisos
 async function checkPermissions(requiredRoles = []) {
@@ -57,31 +59,6 @@ function calcularProgreso(estado) {
   };
 
   return progresoMap[estado] || 0;
-}
-
-// Función auxiliar para simular envío de notificación
-async function simularEnvioNotificacion(notificacion) {
-  return {
-    success: true,
-    message: "Notificación simulada (no implementada)",
-  };
-}
-
-// Función auxiliar para crear notificación automática
-async function crearNotificacionAutomatica(envioId, estado, descripcion) {
-  try {
-    await prisma.notificaciones.create({
-      data: {
-        envioId,
-        tipo: "CAMBIO_ESTADO",
-        titulo: `Envío ${estado}`,
-        mensaje: descripcion,
-        leida: false,
-      },
-    });
-  } catch (error) {
-    console.error("Error al crear notificación:", error);
-  }
 }
 
 // Obtener seguimiento público mejorado
@@ -295,7 +272,12 @@ export async function crearEventoSeguimiento(envioId, eventoData) {
     });
 
     // Crear notificación automática
-    await crearNotificacionAutomatica(envioId, estado, descripcion);
+    await crearNotificacionAutomatica({
+      envioId,
+      tipo: "CAMBIO_ESTADO",
+      estado,
+      descripcion: descripcion || comentario || "",
+    });
 
     return {
       success: true,
@@ -354,17 +336,14 @@ export async function procesarNotificacionesPendientes() {
 
     const notificacionesPendientes = await prisma.notificaciones.findMany({
       where: {
-        leida: false,
-        createdAt: {
-          gte: new Date(Date.now() - 24 * 60 * 60 * 1000),
-        },
+        estado: "PENDIENTE",
       },
       take: 50,
     });
 
     const resultados = [];
     for (const notificacion of notificacionesPendientes) {
-      const resultado = await simularEnvioNotificacion(notificacion);
+      const resultado = await procesarNotificacion(notificacion.id);
       resultados.push(resultado);
     }
 
@@ -373,6 +352,7 @@ export async function procesarNotificacionesPendientes() {
       data: {
         procesadas: resultados.length,
         exitosas: resultados.filter((r) => r.success).length,
+        fallidas: resultados.filter((r) => !r.success).length,
       },
     };
   } catch (error) {

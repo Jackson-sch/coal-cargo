@@ -1,9 +1,13 @@
 const { prisma } = require("../prisma-cjs");
 module.exports = async function createTestUser() {
   try {
-    // Crear una sucursal de prueb a
-    const sucursal = await prisma.sucursales.create({
-      data: {
+    console.log("👤 Creando usuario de prueba...");
+    
+    // Crear o obtener sucursal principal
+    const sucursal = await prisma.sucursales.upsert({
+      where: { id: "sucursal-principal" },
+      update: {},
+      create: {
         id: "sucursal-principal",
         nombre: "Sucursal Principal",
         direccion: "Av. Principal 123",
@@ -12,11 +16,22 @@ module.exports = async function createTestUser() {
         createdAt: new Date(),
         updatedAt: new Date(),
       },
-    }); // Crear usuario de prueb a
+    });
+    
+    console.log(`✅ Sucursal principal: ${sucursal.nombre}`);
+    
+    // Crear o actualizar usuario de prueba
     const bcrypt = require("bcryptjs");
     const hashedPassword = await bcrypt.hash("123456", 10);
-    const user = await prisma.usuarios.create({
-      data: {
+    
+    const user = await prisma.usuarios.upsert({
+      where: { id: "admin-user" },
+      update: {
+        password: hashedPassword,
+        sucursalId: sucursal.id,
+        updatedAt: new Date(),
+      },
+      create: {
         id: "admin-user",
         name: "Administrador",
         email: "admin@coalcargo.com",
@@ -28,7 +43,12 @@ module.exports = async function createTestUser() {
         updatedAt: new Date(),
       },
     });
+    
+    console.log(`✅ Usuario creado/actualizado: ${user.email} (${user.role})`);
+    console.log(`   📧 Email: ${user.email}`);
+    console.log(`   🔑 Contraseña: 123456`);
   } catch (error) {
+    console.error("❌ Error al crear usuario de prueba:", error);
     throw error;
   }
 };

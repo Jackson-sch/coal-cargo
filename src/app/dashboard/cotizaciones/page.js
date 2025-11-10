@@ -98,8 +98,8 @@ export default function CotizacionesPage() {
   };
 
   return (
-    <div className="container mx-auto">
-      <div className="mb-8">
+    <div className="space-y-6">
+      <div>
         <h1 className="text-3xl font-bold mb-3">Cotizaciones</h1>
         <p className="text-sm text-muted-foreground">
           Calcula precios de envío entre sucursales y gestiona cotizaciones

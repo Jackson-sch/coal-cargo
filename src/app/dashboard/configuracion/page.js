@@ -15,6 +15,7 @@ import {
   MapPin,
   Users,
   ArrowRight,
+  Bell,
 } from "lucide-react";
 import { useEmpresaConfig } from "@/hooks/use-empresa-config";
 export default function ConfiguracionPage() {
@@ -75,9 +76,24 @@ export default function ConfiguracionPage() {
         "Gestión de sesiones",
       ],
     },
+    {
+      id: "notificaciones",
+      titulo: "Notificaciones",
+      descripcion:
+        "Configuración de canales de notificación, plantillas y gestión de notificaciones",
+      icono: Bell,
+      href: "/dashboard/configuracion/notificaciones",
+      color: "bg-pink-500",
+      items: [
+        "Canales de notificación",
+        "Notificaciones automáticas",
+        "Plantillas de mensajes",
+        "Historial de notificaciones",
+      ],
+    },
   ];
   return (
-    <div className="container mx-auto p-6 space-y-6">
+    <div className="space-y-6">
       <div className="flex items-center space-x-2">
         <Settings className="h-6 w-6" />
         <h1 className="text-2xl font-bold">Configuración del Sistema</h1>
@@ -87,7 +103,7 @@ export default function ConfiguracionPage() {
         lugar.
       </p>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {secciones.map((seccion) => {
+        {configuraciones.map((seccion) => {
           const IconoComponente = seccion.icono;
           return (
             <Card

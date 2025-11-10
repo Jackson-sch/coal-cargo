@@ -2,6 +2,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
+import { cacheDashboardKpis, CACHE_TAGS } from "@/lib/utils/cache";
 
 // Función auxiliar para verificar permisos
 async function checkPermissions(requiredRoles = []) {
@@ -32,8 +33,8 @@ function handleActionError(error) {
   };
 }
 
-// Obtener KPIs del dashboard
-export async function getDashboardKpis({ sucursalId } = {}) {
+// Obtener KPIs del dashboard (función interna)
+const _getDashboardKpis = async ({ sucursalId, filtroTipo = "ambos" } = {}) => {
   try {
     const user = await checkPermissions([
       "SUPER_ADMIN",
@@ -50,27 +51,62 @@ export async function getDashboardKpis({ sucursalId } = {}) {
     const inicioMes = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
 
     // Filtrar por sucursal si no es SUPER_ADMIN o si SUPER_ADMIN selecciona una sucursal
-    const whereClause = (() => {
-      if (user.role !== "SUPER_ADMIN" && user.sucursalId) {
-        return {
-          OR: [
-            { sucursalOrigenId: user.sucursalId },
-            { sucursalDestinoId: user.sucursalId },
-          ],
-        };
+    const buildWhereClause = (additionalConditions = {}) => {
+      // Construir condiciones base
+      const conditions = {
+        deletedAt: null,
+      };
+
+      // Agregar condiciones adicionales (excepto si tienen OR, las manejamos después)
+      const { OR: orConditions, ...otherConditions } = additionalConditions;
+      Object.assign(conditions, otherConditions);
+
+      // Determinar filtro de sucursal según el tipo seleccionado
+      let sucursalFilter = null;
+      const sucursalIdToFilter =
+        user.role !== "SUPER_ADMIN" ? user.sucursalId : sucursalId;
+
+      if (sucursalIdToFilter) {
+        if (filtroTipo === "origen") {
+          // Solo envíos que se registraron en esta sucursal
+          sucursalFilter = { sucursalOrigenId: sucursalIdToFilter };
+        } else if (filtroTipo === "destino") {
+          // Solo envíos que van a esta sucursal
+          sucursalFilter = { sucursalDestinoId: sucursalIdToFilter };
+        } else {
+          // Ambos: envíos desde y hacia esta sucursal (comportamiento por defecto)
+          sucursalFilter = {
+            OR: [
+              { sucursalOrigenId: sucursalIdToFilter },
+              { sucursalDestinoId: sucursalIdToFilter },
+            ],
+          };
+        }
       }
 
-      if (user.role === "SUPER_ADMIN" && sucursalId) {
-        return {
-          OR: [
-            { sucursalOrigenId: sucursalId },
-            { sucursalDestinoId: sucursalId },
-          ],
-        };
+      // Si no hay filtro de sucursal ni OR adicional, devolver condiciones simples
+      if (!sucursalFilter && !orConditions) {
+        return conditions;
       }
 
-      return {};
-    })();
+      // Si hay filtro de sucursal o OR adicional, usar AND para combinarlos
+      const andConditions = [conditions];
+
+      if (sucursalFilter) {
+        andConditions.push(sucursalFilter);
+      }
+
+      if (orConditions) {
+        andConditions.push({ OR: orConditions });
+      }
+
+      // Si solo hay una condición en AND, devolverla directamente
+      if (andConditions.length === 1) {
+        return andConditions[0];
+      }
+
+      return { AND: andConditions };
+    };
 
     const [
       enviosHoy,
@@ -82,57 +118,56 @@ export async function getDashboardKpis({ sucursalId } = {}) {
     ] = await Promise.all([
       // Envíos de hoy
       prisma.envios.count({
-        where: {
-          ...whereClause,
-          createdAt: { gte: inicioHoy },
-        },
+        where: buildWhereClause({
+          fechaRegistro: { gte: inicioHoy },
+        }),
       }),
       // Envíos del mes
       prisma.envios.count({
-        where: {
-          ...whereClause,
-          createdAt: { gte: inicioMes },
-        },
+        where: buildWhereClause({
+          fechaRegistro: { gte: inicioMes },
+        }),
       }),
       // Envíos entregados hoy
       prisma.envios.count({
-        where: {
-          ...whereClause,
+        where: buildWhereClause({
           estado: "ENTREGADO",
-          updatedAt: { gte: inicioHoy },
-        },
+          OR: [
+            { fechaEntrega: { gte: inicioHoy } },
+            {
+              AND: [{ fechaEntrega: null }, { updatedAt: { gte: inicioHoy } }],
+            },
+          ],
+        }),
       }),
       // Envíos en tránsito
       prisma.envios.count({
-        where: {
-          ...whereClause,
+        where: buildWhereClause({
           estado: { in: ["EN_TRANSITO", "EN_REPARTO"] },
-        },
+        }),
       }),
       // Envíos retrasados (más de 5 días sin actualizar)
       prisma.envios.count({
-        where: {
-          ...whereClause,
+        where: buildWhereClause({
           estado: { notIn: ["ENTREGADO", "DEVUELTO", "ANULADO"] },
           updatedAt: {
             lt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000),
           },
-        },
+        }),
       }),
       // Ingresos del mes
       prisma.envios.aggregate({
-        where: {
-          ...whereClause,
-          createdAt: { gte: inicioMes },
+        where: buildWhereClause({
+          fechaRegistro: { gte: inicioMes },
           estado: { notIn: ["ANULADO"] },
-        },
+        }),
         _sum: { total: true },
       }),
     ]);
 
     // Obtener envíos recientes
     const enviosRecientes = await prisma.envios.findMany({
-      where: whereClause,
+      where: buildWhereClause(),
       include: {
         cliente: {
           select: {
@@ -152,17 +187,18 @@ export async function getDashboardKpis({ sucursalId } = {}) {
           },
         },
       },
-      orderBy: { createdAt: "desc" },
+      orderBy: { fechaRegistro: "desc" },
       take: 10,
     });
 
-    // Obtener estadísticas por estado
+    // Obtener estadísticas por estado (del mes actual o del mes seleccionado)
+    // Estas estadísticas se usan para el gráfico de distribución
+    // Se calcularán dinámicamente en el componente usando los datos de trend
     const estadisticasPorEstado = await prisma.envios.groupBy({
       by: ["estado"],
-      where: {
-        ...whereClause,
-        createdAt: { gte: inicioMes },
-      },
+      where: buildWhereClause({
+        fechaRegistro: { gte: inicioMes },
+      }),
       _count: { id: true },
     });
 
@@ -190,7 +226,8 @@ export async function getDashboardKpis({ sucursalId } = {}) {
           destino: envio.sucursalDestino.nombre,
           estado: envio.estado,
           total: envio.total,
-          createdAt: envio.createdAt,
+          fechaRegistro: envio.fechaRegistro,
+          createdAt: envio.createdAt, // Mantener para compatibilidad
         })),
         estadisticasPorEstado: estadisticasPorEstado.reduce((acc, item) => {
           acc[item.estado] = item._count.id;
@@ -201,6 +238,14 @@ export async function getDashboardKpis({ sucursalId } = {}) {
   } catch (error) {
     return handleActionError(error);
   }
+};
+
+// Exportar getDashboardKpis (sin caché por ahora para evitar problemas con parámetros dinámicos)
+export async function getDashboardKpis({
+  sucursalId,
+  filtroTipo = "ambos",
+} = {}) {
+  return _getDashboardKpis({ sucursalId, filtroTipo });
 }
 
 // Obtener estadísticas de envíos por período
@@ -246,7 +291,8 @@ export async function getEstadisticasEnvios(periodo = "mes") {
       by: ["estado"],
       where: {
         ...whereClause,
-        createdAt: { gte: fechaInicio },
+        deletedAt: null,
+        fechaRegistro: { gte: fechaInicio },
       },
       _count: { id: true },
       _sum: { total: true },
@@ -285,12 +331,104 @@ export async function getEstadisticasEnvios(periodo = "mes") {
   }
 }
 
+// Obtener meses disponibles con datos
+export async function getMesesDisponibles({
+  sucursalId,
+  filtroTipo = "ambos",
+} = {}) {
+  try {
+    const user = await checkPermissions([
+      "SUPER_ADMIN",
+      "ADMIN_SUCURSAL",
+      "OPERADOR",
+    ]);
+
+    // Determinar filtro de sucursal
+    const whereSucursal = (() => {
+      const sucursalIdToFilter =
+        user.role !== "SUPER_ADMIN" ? user.sucursalId : sucursalId;
+
+      if (!sucursalIdToFilter) {
+        return {};
+      }
+
+      if (filtroTipo === "origen") {
+        return { sucursalOrigenId: sucursalIdToFilter };
+      } else if (filtroTipo === "destino") {
+        return { sucursalDestinoId: sucursalIdToFilter };
+      } else {
+        return {
+          OR: [
+            { sucursalOrigenId: sucursalIdToFilter },
+            { sucursalDestinoId: sucursalIdToFilter },
+          ],
+        };
+      }
+    })();
+
+    // Obtener fechas únicas de envíos
+    const envios = await prisma.envios.findMany({
+      where: {
+        ...whereSucursal,
+        deletedAt: null,
+      },
+      select: {
+        fechaRegistro: true,
+      },
+      orderBy: {
+        fechaRegistro: "asc",
+      },
+    });
+
+    // Extraer meses únicos
+    const mesesSet = new Set();
+    envios.forEach((envio) => {
+      if (envio.fechaRegistro) {
+        const fecha = new Date(envio.fechaRegistro);
+        const mesKey = `${fecha.getFullYear()}-${String(
+          fecha.getMonth() + 1
+        ).padStart(2, "0")}`;
+        mesesSet.add(mesKey);
+      }
+    });
+
+    // Convertir a array de objetos
+    const meses = Array.from(mesesSet)
+      .map((mesKey) => {
+        const [año, mes] = mesKey.split("-");
+        const fecha = new Date(Number(año), Number(mes) - 1, 1);
+        return {
+          value: mesKey,
+          label: fecha.toLocaleString("es-PE", {
+            month: "long",
+            year: "numeric",
+          }),
+          año: Number(año),
+          mes: Number(mes),
+        };
+      })
+      .sort((a, b) => {
+        if (a.año !== b.año) return b.año - a.año;
+        return b.mes - a.mes;
+      });
+
+    return {
+      success: true,
+      data: meses,
+    };
+  } catch (error) {
+    return handleActionError(error);
+  }
+}
+
 // Estadísticas completas para el dashboard de "Estadísticas"
 export async function getEstadisticasDashboard({
   periodo = "mes",
   fechaDesde,
   fechaHasta,
   sucursalId,
+  filtroTipo = "ambos",
+  mes, // Formato: "YYYY-MM" (ej: "2025-11")
 } = {}) {
   try {
     const user = await checkPermissions([
@@ -303,7 +441,17 @@ export async function getEstadisticasDashboard({
     let inicio = fechaDesde ? new Date(fechaDesde) : null;
     let fin = fechaHasta ? new Date(fechaHasta) : null;
 
-    if (!inicio || !fin) {
+    // Si se especifica mes (formato "YYYY-MM"), usarlo
+    if (mes) {
+      const partes = mes.split("-");
+      if (partes.length === 2) {
+        const añoNum = Number(partes[0]);
+        const mesNum = Number(partes[1]);
+        inicio = new Date(añoNum, mesNum - 1, 1);
+        // Último día del mes
+        fin = new Date(añoNum, mesNum, 0, 23, 59, 59, 999);
+      }
+    } else if (!inicio || !fin) {
       switch (periodo) {
         case "semana":
           inicio = new Date(hoy.getTime() - 7 * 24 * 60 * 60 * 1000);
@@ -325,25 +473,27 @@ export async function getEstadisticasDashboard({
     }
 
     const whereSucursal = (() => {
-      if (user.role !== "SUPER_ADMIN" && user.sucursalId) {
+      const sucursalIdToFilter =
+        user.role !== "SUPER_ADMIN" ? user.sucursalId : sucursalId;
+
+      if (!sucursalIdToFilter) {
+        return {};
+      }
+
+      // Aplicar el mismo filtro que en getDashboardKpis
+      if (filtroTipo === "origen") {
+        return { sucursalOrigenId: sucursalIdToFilter };
+      } else if (filtroTipo === "destino") {
+        return { sucursalDestinoId: sucursalIdToFilter };
+      } else {
+        // Ambos (comportamiento por defecto)
         return {
           OR: [
-            { sucursalOrigenId: user.sucursalId },
-            { sucursalDestinoId: user.sucursalId },
+            { sucursalOrigenId: sucursalIdToFilter },
+            { sucursalDestinoId: sucursalIdToFilter },
           ],
         };
       }
-
-      if (user.role === "SUPER_ADMIN" && sucursalId) {
-        return {
-          OR: [
-            { sucursalOrigenId: sucursalId },
-            { sucursalDestinoId: sucursalId },
-          ],
-        };
-      }
-
-      return {};
     })();
 
     // Traer envíos en rango; usamos fechaRegistro como fecha de negocio
@@ -391,32 +541,40 @@ export async function getEstadisticasDashboard({
       ([estado, cantidad]) => ({ estado, cantidad })
     );
 
-    // Ingresos y envíos por mes (o por día si rango corto)
-    const usarMes = (fin - inicio) / (1000 * 60 * 60 * 24) > 28;
+    // Si se seleccionó un mes específico, siempre mostrar por día
+    // Si no, usar lógica de agrupación según el rango
+    const diasRango = (fin - inicio) / (1000 * 60 * 60 * 24);
+    const esMesEspecifico = mes !== undefined && diasRango <= 31;
 
-    const keyFn = usarMes
-      ? (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`
-      : (d) =>
-          `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(
-            2,
-            "0"
-          )}-${String(d.getDate()).padStart(2, "0")}`;
+    // Si es un mes específico o rango corto, agrupar por día
+    const usarDia = esMesEspecifico || diasRango <= 31;
 
-    const labelsFn = usarMes
-      ? (key) => {
-          const [y, m] = key.split("-");
-          const date = new Date(Number(y), Number(m) - 1, 1);
-          return date.toLocaleString("es-PE", { month: "short" });
+    const keyFn = usarDia
+      ? (d) => {
+          const fecha = new Date(d);
+          return `${fecha.getFullYear()}-${String(
+            fecha.getMonth() + 1
+          ).padStart(2, "0")}-${String(fecha.getDate()).padStart(2, "0")}`;
         }
-      : (key) => {
+      : (d) =>
+          `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+
+    const labelsFn = usarDia
+      ? (key) => {
           const [y, m, d] = key.split("-");
           const date = new Date(Number(y), Number(m) - 1, Number(d));
           return date.toLocaleDateString("es-PE", {
             day: "2-digit",
             month: "short",
           });
+        }
+      : (key) => {
+          const [y, m] = key.split("-");
+          const date = new Date(Number(y), Number(m) - 1, 1);
+          return date.toLocaleString("es-PE", { month: "short" });
         };
 
+    // Agrupar datos
     const agrupado = new Map();
     for (const e of enviosRango) {
       const key = keyFn(new Date(e.fechaRegistro));
@@ -426,13 +584,49 @@ export async function getEstadisticasDashboard({
       agrupado.set(key, row);
     }
 
-    // Ordenar por fecha
-    const ordenKeys = Array.from(agrupado.keys()).sort();
-    const ingresosPorMes = ordenKeys.map((k) => ({
-      mes: labelsFn(k),
-      ingresos: Math.round(agrupado.get(k).ingresos),
-      envios: agrupado.get(k).envios,
-    }));
+    // Si es un mes específico, crear datos para todos los días del mes (incluso sin envíos)
+    let ingresosPorMes = [];
+    if (esMesEspecifico && usarDia) {
+      // Crear array de todos los días del mes
+      const [año, mesNum] = mes.split("-").map(Number);
+      const primerDia = new Date(año, mesNum - 1, 1);
+      const ultimoDia = new Date(año, mesNum, 0); // Último día del mes
+      const hoy = new Date();
+      hoy.setHours(0, 0, 0, 0);
+
+      const todosLosDias = [];
+      for (let d = 1; d <= ultimoDia.getDate(); d++) {
+        const fecha = new Date(año, mesNum - 1, d);
+        fecha.setHours(0, 0, 0, 0);
+
+        // Solo incluir días hasta hoy si es el mes actual
+        if (fecha <= hoy) {
+          const key = keyFn(fecha);
+          const datos = agrupado.get(key) || { ingresos: 0, envios: 0 };
+          todosLosDias.push({
+            fecha: fecha,
+            key: key,
+            ingresos: Math.round(datos.ingresos),
+            envios: datos.envios,
+          });
+        }
+      }
+
+      ingresosPorMes = todosLosDias.map((item) => ({
+        mes: labelsFn(item.key),
+        ingresos: item.ingresos,
+        envios: item.envios,
+        fecha: item.fecha,
+      }));
+    } else {
+      // Ordenar por fecha para rangos más largos
+      const ordenKeys = Array.from(agrupado.keys()).sort();
+      ingresosPorMes = ordenKeys.map((k) => ({
+        mes: labelsFn(k),
+        ingresos: Math.round(agrupado.get(k).ingresos),
+        envios: agrupado.get(k).envios,
+      }));
+    }
 
     // Top clientes por ingresos
     const porCliente = new Map();
@@ -445,69 +639,148 @@ export async function getEstadisticasDashboard({
     }
 
     // Obtener nombres de clientes
-    const clienteIds = Array.from(porCliente.keys());
-    const clientes = clienteIds.length
-      ? await prisma.clientes.findMany({
-          where: { id: { in: clienteIds } },
-          select: {
-            id: true,
-            nombre: true,
-            apellidos: true,
-            razonSocial: true,
-          },
-        })
-      : [];
+    const clienteIds = Array.from(porCliente.keys()).filter(Boolean);
+    const clientes =
+      clienteIds.length > 0
+        ? await prisma.clientes.findMany({
+            where: {
+              id: { in: clienteIds },
+              deletedAt: null, // Solo clientes activos
+            },
+            select: {
+              id: true,
+              nombre: true,
+              apellidos: true,
+              razonSocial: true,
+              esEmpresa: true,
+            },
+          })
+        : [];
+
+    // Crear mapa de IDs a nombres para acceso rápido
+    const mapaClientes = new Map();
+    clientes.forEach((c) => {
+      const nombreCompleto = c.esEmpresa
+        ? c.razonSocial || c.nombre || "Cliente sin nombre"
+        : [c.nombre, c.apellidos].filter(Boolean).join(" ") ||
+          "Cliente sin nombre";
+      mapaClientes.set(c.id, nombreCompleto);
+    });
 
     const nombreCliente = (id) => {
-      const c = clientes.find((x) => x.id === id);
-      return (
-        c?.razonSocial ||
-        [c?.nombre, c?.apellidos].filter(Boolean).join(" ") ||
-        "Cliente"
-      );
+      if (!id) return "Cliente sin nombre";
+      return mapaClientes.get(id) || "Cliente sin nombre";
     };
 
+    // Construir array de top clientes con nombres reales
     const topClientes = Array.from(porCliente.entries())
-      .map(([id, v]) => ({
-        nombre: nombreCliente(id),
-        envios: v.envios,
-        ingresos: Math.round(v.ingresos),
-      }))
-      .sort((a, b) => b.ingresos - a.ingresos)
+      .map(([id, v]) => {
+        const nombre = nombreCliente(id);
+        // Solo incluir si tiene un nombre válido
+        if (!nombre || nombre === "Cliente sin nombre") {
+          return null;
+        }
+
+        return {
+          nombre: nombre,
+          envios: v.envios,
+          ingresos: Math.round(v.ingresos),
+        };
+      })
+      .filter(Boolean) // Eliminar clientes sin nombre válido
+      .sort((a, b) => {
+        // Ordenar primero por ingresos (descendente), luego por envíos (descendente)
+        if (b.ingresos !== a.ingresos) {
+          return b.ingresos - a.ingresos;
+        }
+        return b.envios - a.envios;
+      })
       .slice(0, 5);
 
     // Rutas populares (origen-destino)
     const porRuta = new Map();
     for (const e of enviosRango) {
-      const key = `${e.sucursalOrigenId}-${e.sucursalDestinoId}`;
+      // Solo procesar envíos con sucursales válidas
+      if (!e.sucursalOrigenId || !e.sucursalDestinoId) continue;
+
+      // Usar un separador que no pueda estar en los IDs (por ejemplo, ":::")
+      const key = `${e.sucursalOrigenId}:::${e.sucursalDestinoId}`;
       const row = porRuta.get(key) || { envios: 0, ingresos: 0 };
       row.envios += 1;
       if (e.estado !== "ANULADO") row.ingresos += e.total || 0;
       porRuta.set(key, row);
     }
 
-    const rutaIds = Array.from(porRuta.keys()).flatMap((k) => k.split("-"));
-    const sucursales = rutaIds.length
-      ? await prisma.sucursales.findMany({
-          where: { id: { in: rutaIds } },
-          select: { id: true, nombre: true },
-        })
-      : [];
+    // Si no hay rutas, retornar array vacío
+    if (porRuta.size === 0) {
+      return {
+        success: true,
+        data: {
+          resumen: {
+            totalEnvios,
+            ingresosTotales,
+            clientesActivos,
+            enviosEnTransito,
+          },
+          enviosPorEstado,
+          ingresosPorMes,
+          topClientes,
+          rutasPopulares: [],
+        },
+      };
+    }
 
-    const nombreSucursal = (id) =>
-      sucursales.find((s) => s.id === id)?.nombre || "Sucursal";
+    // Obtener todos los IDs únicos de sucursales
+    const rutaIds = Array.from(porRuta.keys()).flatMap((k) => {
+      const [o, d] = k.split(":::");
+      return [o, d].filter(Boolean);
+    });
+    const idsUnicos = [...new Set(rutaIds)].filter(Boolean);
 
+    // Obtener nombres de sucursales (incluyendo eliminadas para mostrar nombres históricos)
+    const sucursalesRutas =
+      idsUnicos.length > 0
+        ? await prisma.sucursales.findMany({
+            where: {
+              id: { in: idsUnicos },
+              // NO filtrar por deletedAt aquí, para poder mostrar rutas históricas
+            },
+            select: { id: true, nombre: true, deletedAt: true },
+          })
+        : [];
+
+    // Crear mapa de IDs a nombres para acceso rápido
+    const mapaSucursales = new Map(
+      sucursalesRutas.map((s) => [s.id, s.nombre])
+    );
+
+    const nombreSucursal = (id) => {
+      if (!id) return "Sucursal desconocida";
+      const nombre = mapaSucursales.get(id);
+      return nombre || `Sucursal ${id.substring(0, 8)}...`; // Mostrar parte del ID si no se encuentra
+    };
+
+    // Construir array de rutas populares con nombres reales
     const rutasPopulares = Array.from(porRuta.entries())
       .map(([key, v]) => {
-        const [o, d] = key.split("-");
+        const [origenId, destinoId] = key.split(":::");
+        const origenNombre = nombreSucursal(origenId);
+        const destinoNombre = nombreSucursal(destinoId);
+
         return {
-          origen: nombreSucursal(o),
-          destino: nombreSucursal(d),
+          origen: origenNombre,
+          destino: destinoNombre,
           envios: v.envios,
           ingresos: Math.round(v.ingresos),
         };
       })
-      .sort((a, b) => b.envios - a.envios)
+      .sort((a, b) => {
+        // Ordenar primero por ingresos (descendente), luego por envíos (descendente)
+        if (b.ingresos !== a.ingresos) {
+          return b.ingresos - a.ingresos;
+        }
+        return b.envios - a.envios;
+      })
       .slice(0, 5);
 
     return {

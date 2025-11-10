@@ -1,7 +1,8 @@
 const { prisma } = require("../prisma-cjs");
 async function seedSucursalesYTarifas() {
   try {
-    // Crear sucursales adicionale s
+    console.log("🏢 Creando sucursales adicionales...");
+    // Crear sucursales adicionales
     const sucursales = [
       {
         id: "sucursal-arequipa",
@@ -25,13 +26,25 @@ async function seedSucursalesYTarifas() {
         telefono: "044-123456",
       },
     ];
+    
     for (const sucursal of sucursales) {
       await prisma.sucursales.upsert({
         where: { id: sucursal.id },
         update: sucursal,
         create: { ...sucursal, createdAt: new Date(), updatedAt: new Date() },
       });
-    } // Obtener todas las sucursales (incluyendo la principa l) const todasLasSucursales = await prisma.sucursales.findMany({ where: { deletedAt: null }, });// Crear tarifas entre todas las sucursale s
+      console.log(`✅ Sucursal creada/actualizada: ${sucursal.nombre}`);
+    }
+    
+    // Obtener todas las sucursales (incluyendo la principal)
+    const todasLasSucursales = await prisma.sucursales.findMany({
+      where: { deletedAt: null },
+    });
+    
+    console.log(`📋 Total de sucursales: ${todasLasSucursales.length}`);
+    console.log("💰 Creando tarifas entre sucursales...");
+    
+    // Crear tarifas entre todas las sucursales
     const tarifasBase = {
       "Lima-Arequipa": { precioBase: 25.0, precioKg: 4.0, tiempoEstimado: 2 },
       "Lima-Cusco": { precioBase: 30.0, precioKg: 5.0, tiempoEstimado: 3 },
@@ -87,12 +100,19 @@ async function seedSucursalesYTarifas() {
           });
         }
       }
-    } // Mostrar resume n
+    }
+    
+    // Mostrar resumen
     const totalSucursales = await prisma.sucursales.count({
       where: { deletedAt: null },
     });
     const totalTarifas = await prisma.tarifas_sucursales.count();
+    
+    console.log(`✅ Resumen:`);
+    console.log(`   🏢 Sucursales: ${totalSucursales}`);
+    console.log(`   💰 Tarifas: ${totalTarifas}`);
   } catch (error) {
+    console.error("❌ Error en seed de sucursales y tarifas:", error);
     throw error;
   }
 }

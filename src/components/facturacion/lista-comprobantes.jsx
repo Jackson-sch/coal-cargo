@@ -38,6 +38,7 @@ import {
   CheckCircle,
   XCircle,
   AlertCircle,
+  Mail,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -196,6 +197,39 @@ export default function ListaComprobantes() {
     } catch (error) {
       console.error("Error al reenviar comprobante:", error);
       toast.error("Error al reenviar comprobante");
+    } finally {
+      setActualizandoEstado((prev) => ({ ...prev, [comprobanteId]: false }));
+    }
+  };
+
+  const reenviarEmailComprobante = async (comprobanteId) => {
+    try {
+      setActualizandoEstado((prev) => ({ ...prev, [comprobanteId]: true }));
+      const { enviarEmailComprobanteReenviado, enviarEmailComprobanteEmitido } = await import(
+        "@/lib/utils/enviar-email-comprobante"
+      );
+
+      // Obtener el comprobante para verificar su estado
+      const comprobante = comprobantes.find((c) => c.id === comprobanteId);
+      
+      if (!comprobante) {
+        toast.error("Comprobante no encontrado");
+        return;
+      }
+
+      // Si está aceptado, usar la función de emitido, sino la de reenviado
+      const resultado = comprobante.estado === "ACEPTADO"
+        ? await enviarEmailComprobanteEmitido(comprobanteId)
+        : await enviarEmailComprobanteReenviado(comprobanteId);
+
+      if (resultado.success) {
+        toast.success("Email reenviado correctamente");
+      } else {
+        toast.error(resultado.error || "Error al reenviar email");
+      }
+    } catch (error) {
+      console.error("Error al reenviar email:", error);
+      toast.error("Error al reenviar email");
     } finally {
       setActualizandoEstado((prev) => ({ ...prev, [comprobanteId]: false }));
     }
@@ -507,6 +541,7 @@ export default function ListaComprobantes() {
                               size="sm"
                               onClick={() => verDetalle(comprobante)}
                               className="h-8 w-8 p-0"
+                              title="Ver detalle"
                             >
                               <Eye className="h-4 w-4" />
                             </Button>
@@ -516,6 +551,7 @@ export default function ListaComprobantes() {
                                 size="sm"
                                 onClick={() => descargarPDF(comprobante)}
                                 className="h-8 w-8 p-0"
+                                title="Descargar PDF"
                               >
                                 <Download className="h-4 w-4" />
                               </Button>
@@ -523,9 +559,26 @@ export default function ListaComprobantes() {
                             <Button
                               variant="ghost"
                               size="sm"
+                              onClick={() => reenviarEmailComprobante(comprobante.id)}
+                              disabled={actualizandoEstado[comprobante.id]}
+                              className="h-8 w-8 p-0"
+                              title="Reenviar email"
+                            >
+                              <Mail
+                                className={`h-4 w-4 ${
+                                  actualizandoEstado[comprobante.id]
+                                    ? "animate-pulse"
+                                    : ""
+                                }`}
+                              />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
                               onClick={() => consultarEstado(comprobante.id)}
                               disabled={actualizandoEstado[comprobante.id]}
                               className="h-8 w-8 p-0"
+                              title="Consultar estado"
                             >
                               <RefreshCw
                                 className={`h-4 w-4 ${

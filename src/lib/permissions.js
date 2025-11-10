@@ -1,12 +1,165 @@
-/** * Sistema de Permisos Híbrido * Combina roles base (enum) con permisos granulares (BD) */ // Permisos base por rol (siempre activo s) export const PERMISOS_BASE_POR_ROL = { SUPER_ADMIN: [ // Acceso complet o "dashboard.view", "clientes.view", "clientes.create", "clientes.edit", "clientes.delete", "clientes.export", "envios.view", "envios.create", "envios.edit", "envios.delete", "envios.assign", "cotizaciones.view", "cotizaciones.create", "cotizaciones.edit", "cotizaciones.delete", "seguimiento.view", "seguimiento.all", "usuarios.view", "usuarios.create", "usuarios.edit", "usuarios.delete", "configuracion.view", "configuracion.edit", "reportes.view", "reportes.export", "tarifas.view", "tarifas.create", "tarifas.edit", "tarifas.delete", "sucursales.view", "sucursales.create", "sucursales.edit", "sucursales.delete", "vehiculos.view", "vehiculos.create", "vehiculos.edit", "vehiculos.delete", ], ADMIN_SUCURSAL: [ "dashboard.view", "clientes.view", "clientes.create", "clientes.edit", "clientes.export", "envios.view", "envios.create", "envios.edit", "envios.assign", "cotizaciones.view", "cotizaciones.create", "cotizaciones.edit", "seguimiento.view", "seguimiento.sucursal", "usuarios.view", "usuarios.create", "usuarios.edit", "reportes.view", "reportes.sucursal", "tarifas.view", "vehiculos.view", "vehiculos.edit", ], OPERADOR: [ "dashboard.view", "clientes.view", "clientes.create", "clientes.edit", "envios.view", "envios.create", "envios.edit", "cotizaciones.view", "cotizaciones.create", "seguimiento.view", "tarifas.view", ], CONDUCTOR: [ "dashboard.view", "envios.view", "envios.edit", "seguimiento.view", "seguimiento.update", "clientes.view", ], CONTADOR: [ "dashboard.view", "reportes.view", "reportes.export", "reportes.financial", "envios.view", "clientes.view", "tarifas.view", ], CLIENTE: ["seguimiento.own", "cotizaciones.create", "cotizaciones.view"], }; // Definición de todos los permisos disponible s
+/**
+ * Sistema de Permisos Híbrido
+ * Combina roles base (enum) con permisos granulares (BD)
+ */
+
+// Permisos base por rol (siempre activos)
+export const PERMISOS_BASE_POR_ROL = {
+  SUPER_ADMIN: [
+    // Acceso completo
+    "dashboard.view",
+    "clientes.view",
+    "clientes.create",
+    "clientes.edit",
+    "clientes.delete",
+    "clientes.export",
+    "envios.view",
+    "envios.create",
+    "envios.edit",
+    "envios.delete",
+    "envios.assign",
+    "cotizaciones.view",
+    "cotizaciones.create",
+    "cotizaciones.edit",
+    "cotizaciones.delete",
+    "seguimiento.view",
+    "seguimiento.all",
+    "usuarios.view",
+    "usuarios.create",
+    "usuarios.edit",
+    "usuarios.delete",
+    "configuracion.view",
+    "configuracion.edit",
+    "reportes.view",
+    "reportes.export",
+    "tarifas.view",
+    "tarifas.create",
+    "tarifas.edit",
+    "tarifas.delete",
+    "sucursales.view",
+    "sucursales.create",
+    "sucursales.edit",
+    "sucursales.delete",
+    "vehiculos.view",
+    "vehiculos.create",
+    "vehiculos.edit",
+    "vehiculos.delete",
+    "rutas.view",
+    "rutas.create",
+    "rutas.edit",
+    "rutas.delete",
+    "pagos.view",
+    "pagos.create",
+    "pagos.edit",
+    "facturacion.view",
+    "facturacion.emitir",
+    "facturacion.config",
+    "notificaciones.view",
+    "notificaciones.edit",
+    "auditoria.view",
+    "respaldos.view",
+    "respaldos.create",
+    "respaldos.restore",
+  ],
+  ADMIN_SUCURSAL: [
+    // Dashboard
+    "dashboard.view",
+    // Clientes
+    "clientes.view",
+    "clientes.create",
+    "clientes.edit",
+    "clientes.export",
+    // Envíos
+    "envios.view",
+    "envios.create",
+    "envios.edit",
+    "envios.assign",
+    // Cotizaciones
+    "cotizaciones.view",
+    "cotizaciones.create",
+    "cotizaciones.edit",
+    // Seguimiento
+    "seguimiento.view",
+    "seguimiento.sucursal",
+    // Usuarios (limitado a OPERADOR y CONDUCTOR de su sucursal)
+    "usuarios.view",
+    "usuarios.create",
+    "usuarios.edit",
+    // Reportes
+    "reportes.view",
+    "reportes.sucursal",
+    "reportes.export",
+    // Tarifas (solo lectura)
+    "tarifas.view",
+    // Vehículos (de su sucursal)
+    "vehiculos.view",
+    "vehiculos.create",
+    "vehiculos.edit",
+    // Rutas (de su sucursal)
+    "rutas.view",
+    "rutas.create",
+    "rutas.edit",
+    // Pagos (de su sucursal)
+    "pagos.view",
+    "pagos.create",
+    // Facturación (emitir para su sucursal)
+    "facturacion.view",
+    "facturacion.emitir",
+    // Notificaciones (configurar para su sucursal)
+    "notificaciones.view",
+    "notificaciones.edit",
+    // Auditoría (solo de su sucursal)
+    "auditoria.view",
+  ],
+  OPERADOR: [
+    "dashboard.view",
+    "clientes.view",
+    "clientes.create",
+    "clientes.edit",
+    "envios.view",
+    "envios.create",
+    "envios.edit",
+    "cotizaciones.view",
+    "cotizaciones.create",
+    "seguimiento.view",
+    "tarifas.view",
+    "pagos.view",
+    "pagos.create",
+  ],
+  CONDUCTOR: [
+    "dashboard.view",
+    "envios.view",
+    "envios.edit",
+    "seguimiento.view",
+    "seguimiento.update",
+    "clientes.view",
+  ],
+  CONTADOR: [
+    "dashboard.view",
+    "reportes.view",
+    "reportes.export",
+    "reportes.financial",
+    "envios.view",
+    "clientes.view",
+    "tarifas.view",
+    "facturacion.view",
+    "facturacion.emitir",
+    "pagos.view",
+    "pagos.create",
+  ],
+  CLIENTE: ["seguimiento.own", "cotizaciones.create", "cotizaciones.view"],
+};
+
+// Definición de todos los permisos disponibles
 export const PERMISOS_DISPONIBLES = [
-  // Dashboar d
+  // Dashboard
   {
     codigo: "dashboard.view",
     nombre: "Ver Dashboard",
     categoria: "Dashboard",
     descripcion: "Acceso al panel principal",
-  }, // Cliente s
+  },
+  // Clientes
   {
     codigo: "clientes.view",
     nombre: "Ver Clientes",
@@ -36,7 +189,8 @@ export const PERMISOS_DISPONIBLES = [
     nombre: "Exportar Clientes",
     categoria: "Clientes",
     descripcion: "Exportar datos de clientes",
-  }, // Envío s
+  },
+  // Envíos
   {
     codigo: "envios.view",
     nombre: "Ver Envíos",
@@ -66,7 +220,8 @@ export const PERMISOS_DISPONIBLES = [
     nombre: "Asignar Envíos",
     categoria: "Envíos",
     descripcion: "Asignar envíos a conductores",
-  }, // Cotizacione s
+  },
+  // Cotizaciones
   {
     codigo: "cotizaciones.view",
     nombre: "Ver Cotizaciones",
@@ -90,7 +245,8 @@ export const PERMISOS_DISPONIBLES = [
     nombre: "Eliminar Cotizaciones",
     categoria: "Cotizaciones",
     descripcion: "Eliminar cotizaciones",
-  }, // Seguimient o
+  },
+  // Seguimiento
   {
     codigo: "seguimiento.view",
     nombre: "Ver Seguimiento",
@@ -120,7 +276,8 @@ export const PERMISOS_DISPONIBLES = [
     nombre: "Actualizar Seguimiento",
     categoria: "Seguimiento",
     descripcion: "Actualizar estado de envíos",
-  }, // Usuario s
+  },
+  // Usuarios
   {
     codigo: "usuarios.view",
     nombre: "Ver Usuarios",
@@ -144,7 +301,8 @@ export const PERMISOS_DISPONIBLES = [
     nombre: "Eliminar Usuarios",
     categoria: "Usuarios",
     descripcion: "Eliminar usuarios del sistema",
-  }, // Configuració n
+  },
+  // Configuración
   {
     codigo: "configuracion.view",
     nombre: "Ver Configuración",
@@ -156,7 +314,8 @@ export const PERMISOS_DISPONIBLES = [
     nombre: "Editar Configuración",
     categoria: "Configuración",
     descripcion: "Modificar configuraciones del sistema",
-  }, // Reporte s
+  },
+  // Reportes
   {
     codigo: "reportes.view",
     nombre: "Ver Reportes",
@@ -180,7 +339,8 @@ export const PERMISOS_DISPONIBLES = [
     nombre: "Reportes Sucursal",
     categoria: "Reportes",
     descripcion: "Reportes de su sucursal",
-  }, // Tarifa s
+  },
+  // Tarifas
   {
     codigo: "tarifas.view",
     nombre: "Ver Tarifas",
@@ -204,7 +364,8 @@ export const PERMISOS_DISPONIBLES = [
     nombre: "Eliminar Tarifas",
     categoria: "Tarifas",
     descripcion: "Eliminar tarifas del sistema",
-  }, // Sucursale s
+  },
+  // Sucursales
   {
     codigo: "sucursales.view",
     nombre: "Ver Sucursales",
@@ -228,7 +389,8 @@ export const PERMISOS_DISPONIBLES = [
     nombre: "Eliminar Sucursales",
     categoria: "Sucursales",
     descripcion: "Eliminar sucursales",
-  }, // Vehículo s
+  },
+  // Vehículos
   {
     codigo: "vehiculos.view",
     nombre: "Ver Vehículos",
@@ -253,24 +415,128 @@ export const PERMISOS_DISPONIBLES = [
     categoria: "Vehículos",
     descripcion: "Eliminar vehículos",
   },
+  // Rutas
+  {
+    codigo: "rutas.view",
+    nombre: "Ver Rutas",
+    categoria: "Rutas",
+    descripcion: "Visualizar rutas",
+  },
+  {
+    codigo: "rutas.create",
+    nombre: "Crear Rutas",
+    categoria: "Rutas",
+    descripcion: "Registrar nuevas rutas",
+  },
+  {
+    codigo: "rutas.edit",
+    nombre: "Editar Rutas",
+    categoria: "Rutas",
+    descripcion: "Modificar datos de rutas",
+  },
+  {
+    codigo: "rutas.delete",
+    nombre: "Eliminar Rutas",
+    categoria: "Rutas",
+    descripcion: "Eliminar rutas",
+  },
+  // Pagos
+  {
+    codigo: "pagos.view",
+    nombre: "Ver Pagos",
+    categoria: "Pagos",
+    descripcion: "Visualizar pagos",
+  },
+  {
+    codigo: "pagos.create",
+    nombre: "Crear Pagos",
+    categoria: "Pagos",
+    descripcion: "Registrar nuevos pagos",
+  },
+  {
+    codigo: "pagos.edit",
+    nombre: "Editar Pagos",
+    categoria: "Pagos",
+    descripcion: "Modificar datos de pagos",
+  },
+  // Facturación
+  {
+    codigo: "facturacion.view",
+    nombre: "Ver Facturación",
+    categoria: "Facturación",
+    descripcion: "Visualizar comprobantes",
+  },
+  {
+    codigo: "facturacion.emitir",
+    nombre: "Emitir Comprobantes",
+    categoria: "Facturación",
+    descripcion: "Emitir comprobantes electrónicos",
+  },
+  {
+    codigo: "facturacion.config",
+    nombre: "Configurar Facturación",
+    categoria: "Facturación",
+    descripcion: "Configurar datos de facturación (SUNAT)",
+  },
+  // Notificaciones
+  {
+    codigo: "notificaciones.view",
+    nombre: "Ver Notificaciones",
+    categoria: "Notificaciones",
+    descripcion: "Visualizar notificaciones",
+  },
+  {
+    codigo: "notificaciones.edit",
+    nombre: "Editar Notificaciones",
+    categoria: "Notificaciones",
+    descripcion: "Configurar notificaciones",
+  },
+  // Auditoría
+  {
+    codigo: "auditoria.view",
+    nombre: "Ver Auditoría",
+    categoria: "Auditoría",
+    descripcion: "Visualizar logs de auditoría",
+  },
+  // Respaldos
+  {
+    codigo: "respaldos.view",
+    nombre: "Ver Respaldos",
+    categoria: "Respaldos",
+    descripcion: "Visualizar respaldos",
+  },
+  {
+    codigo: "respaldos.create",
+    nombre: "Crear Respaldos",
+    categoria: "Respaldos",
+    descripcion: "Crear respaldos del sistema",
+  },
+  {
+    codigo: "respaldos.restore",
+    nombre: "Restaurar Respaldos",
+    categoria: "Respaldos",
+    descripcion: "Restaurar respaldos del sistema",
+  },
 ];
-/** * Obtener permisos base de un rol */ export function getPermisosBaseRol(
-  rol
-) {
+
+/**
+ * Obtener permisos base de un rol
+ */
+export function getPermisosBaseRol(rol) {
   return PERMISOS_BASE_POR_ROL[rol] || [];
 }
 
-/** * Verificar si un usuario tiene un permiso específico */ export function tienePermiso(
-  usuario,
-  permiso
-) {
-  // 1. Verificar permisos base del ro l
+/**
+ * Verificar si un usuario tiene un permiso específico
+ */
+export function tienePermiso(usuario, permiso) {
+  // 1. Verificar permisos base del rol
   const permisosBase = getPermisosBaseRol(usuario.role);
   if (permisosBase.includes(permiso)) {
     return true;
   }
 
-  // 2. Verificar permisos adicionales de la B D
+  // 2. Verificar permisos adicionales de la BD
   if (usuario.permisos) {
     const permisoAdicional = usuario.permisos.find(
       (p) => p.permiso.codigo === permiso && p.otorgado
@@ -282,9 +548,10 @@ export const PERMISOS_DISPONIBLES = [
   return false;
 }
 
-/** * Obtener todos los permisos de un usuario (base + adicionales) */ export function getPermisosUsuario(
-  usuario
-) {
+/**
+ * Obtener todos los permisos de un usuario (base + adicionales)
+ */
+export function getPermisosUsuario(usuario) {
   const permisosBase = getPermisosBaseRol(usuario.role);
   const permisosAdicionales = usuario.permisos
     ? usuario.permisos.filter((p) => p.otorgado).map((p) => p.permiso.codigo)
@@ -292,7 +559,10 @@ export const PERMISOS_DISPONIBLES = [
   return [...new Set([...permisosBase, ...permisosAdicionales])];
 }
 
-/** * Agrupar permisos por categoría */ export function agruparPermisosPorCategoria() {
+/**
+ * Agrupar permisos por categoría
+ */
+export function agruparPermisosPorCategoria() {
   const grupos = {};
   PERMISOS_DISPONIBLES.forEach((permiso) => {
     if (!grupos[permiso.categoria]) {

@@ -1,14 +1,15 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useSession } from "next-auth/react";
 import { Package, CheckCircle, AlertTriangle, Truck } from "lucide-react";
 import { toast } from "sonner";
 import {
   getDashboardKpis,
   getEstadisticasDashboard,
+  getMesesDisponibles,
 } from "@/lib/actions/dashboard";
-import { getSucursales } from "@/lib/actions/sucursales";
+import { getSucursalesList } from "@/lib/actions/sucursales";
 import Recientes from "@/components/dashboard/recientes";
 import Distribucion from "@/components/dashboard/distribucion";
 import AccionesRapidas from "@/components/dashboard/acciones-rapidas";
@@ -26,78 +27,242 @@ export default function DashboardPage() {
   const [kpis, setKpis] = useState(null);
   const [loading, setLoading] = useState(true);
   const [sucursales, setSucursales] = useState([]);
-  const [sucursalId, setSucursalId] = useState("ALL"); // "ALL" = toda s
+  const [sucursalId, setSucursalId] = useState("ALL"); // "ALL" = todas
+  const [filtroTipo, setFiltroTipo] = useState("ambos"); // "origen", "destino", "ambos"
   const [trend, setTrend] = useState(null);
+  const [ultimaActualizacion, setUltimaActualizacion] = useState(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const [mesSeleccionado, setMesSeleccionado] = useState(() => {
+    // Por defecto, mes actual en formato "YYYY-MM"
+    const hoy = new Date();
+    return `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, "0")}`;
+  });
+  const [mesesDisponibles, setMesesDisponibles] = useState([]);
 
   useEffect(() => {
-    // Cuando esté lista la sesión, cargar dato s
+    // Cuando esté lista la sesión, cargar datos
     if (session) {
       if (session?.user?.role === "SUPER_ADMIN") {
         cargarSucursales();
       }
-      fetchKpis();
+      cargarMesesDisponibles();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session, sucursalId, filtroTipo]);
+
+  // Cargar KPIs cuando cambie la sesión, la sucursal o el tipo de filtro
+  useEffect(() => {
+    if (session) {
+      fetchKpis(true);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session?.user?.id, sucursalId, filtroTipo]); // Depende de cambios en usuario, sucursal o tipo de filtro
+
+  // Cargar trend cuando cambie el mes seleccionado
+  useEffect(() => {
+    if (session && mesSeleccionado) {
       fetchTrend();
     }
-  }, [session]);
-
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mesSeleccionado]);
+  
+  // Actualizar datos cuando la página vuelve a estar visible
   useEffect(() => {
-    const id = setInterval(() => {
-      fetchKpis();
-      fetchTrend();
-    }, 90000);
-    return () => clearInterval(id);
-  }, []);
+    if (!session) return;
 
-  const cargarSucursales = async () => {
-    try {
-      const res = await getSucursales();
-      if (res?.success) setSucursales(res.data || []);
-    } catch (e) {}
-  };
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        // Página vuelve a estar visible, actualizar datos
+        fetchKpis(false);
+        fetchTrend();
+      }
+    };
 
-  const fetchKpis = async () => {
-    try {
-      setLoading(true);
-      const result = await getDashboardKpis({
-        sucursalId:
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session?.user?.id, sucursalId, filtroTipo]);
+
+  // Actualizar datos automáticamente cada 5 minutos (300000 ms)
+  // Solo cuando la página está activa (no en background)
+  useEffect(() => {
+    // Solo establecer el intervalo si hay sesión
+    if (!session) return;
+
+    // Función para actualizar datos sin mostrar loading
+    const actualizarDatosEnSegundoPlano = async () => {
+      if (document.hidden) return; // No actualizar si la página está en background
+      
+      try {
+        const selectedSucursalId = 
           session?.user?.role === "SUPER_ADMIN" &&
           sucursalId &&
           sucursalId !== "ALL"
             ? sucursalId
-            : undefined,
+            : undefined;
+        
+        // Actualizar KPIs sin mostrar loading
+        const tipoFiltro = selectedSucursalId ? filtroTipo : "ambos";
+        const kpisResult = await getDashboardKpis({ 
+          sucursalId: selectedSucursalId,
+          filtroTipo: tipoFiltro,
+        });
+        if (kpisResult.success) {
+          setKpis(kpisResult.data);
+          setUltimaActualizacion(new Date());
+        }
+        
+        // Actualizar tendencia
+        const trendResult = await getEstadisticasDashboard({
+          periodo: "mes",
+          sucursalId: selectedSucursalId,
+          filtroTipo: tipoFiltro,
+          mes: mesSeleccionado,
+        });
+        if (trendResult?.success) {
+          setTrend(trendResult.data);
+        }
+      } catch (error) {
+        console.error("Error al actualizar datos en segundo plano:", error);
+      }
+    };
+
+    const id = setInterval(actualizarDatosEnSegundoPlano, 300000); // 5 minutos
+    return () => clearInterval(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session, sucursalId, filtroTipo]);
+
+  const cargarSucursales = async () => {
+    try {
+      const res = await getSucursalesList();
+      if (res?.success) {
+        setSucursales(res.data || []);
+      } else {
+        console.error("Error al cargar sucursales:", res?.error);
+      }
+    } catch (e) {
+      console.error("Error al cargar sucursales:", e);
+    }
+  };
+
+  const cargarMesesDisponibles = async () => {
+    try {
+      const selectedSucursalId = 
+        session?.user?.role === "SUPER_ADMIN" &&
+        sucursalId &&
+        sucursalId !== "ALL"
+          ? sucursalId
+          : undefined;
+      
+      const tipoFiltro = selectedSucursalId ? filtroTipo : "ambos";
+      
+      const res = await getMesesDisponibles({
+        sucursalId: selectedSucursalId,
+        filtroTipo: tipoFiltro,
       });
+      
+      if (res?.success) {
+        setMesesDisponibles(res.data || []);
+        // Si el mes seleccionado no está en la lista, usar el mes actual
+        if (res.data.length > 0) {
+          const mesActual = res.data[0].value; // El primero es el más reciente
+          if (!res.data.find((m) => m.value === mesSeleccionado)) {
+            setMesSeleccionado(mesActual);
+          }
+        }
+      }
+    } catch (e) {
+      console.error("Error al cargar meses disponibles:", e);
+    }
+  };
+
+  const fetchKpis = useCallback(async (showLoading = true) => {
+    try {
+      if (showLoading) setLoading(true);
+      // Determinar el sucursalId a usar y el tipo de filtro
+      const selectedSucursalId = 
+        session?.user?.role === "SUPER_ADMIN" &&
+        sucursalId &&
+        sucursalId !== "ALL"
+          ? sucursalId
+          : undefined;
+      
+      const tipoFiltro = selectedSucursalId ? filtroTipo : "ambos";
+      
+      const result = await getDashboardKpis({
+        sucursalId: selectedSucursalId,
+        filtroTipo: tipoFiltro,
+      });
+      
       if (result.success) {
         setKpis(result.data);
+        setUltimaActualizacion(new Date());
       } else {
         toast.error(result.error || "Error al cargar estadísticas");
       }
     } catch (error) {
+      console.error("Error al cargar KPIs:", error);
       toast.error("Error al cargar estadísticas");
     } finally {
-      setLoading(false);
+      if (showLoading) setLoading(false);
     }
-  };
+  }, [session, sucursalId, filtroTipo]);
 
-  const fetchTrend = async () => {
+  const fetchTrend = useCallback(async () => {
     try {
+      // Determinar el sucursalId a usar y el tipo de filtro
+      const selectedSucursalId = 
+        session?.user?.role === "SUPER_ADMIN" &&
+        sucursalId &&
+        sucursalId !== "ALL"
+          ? sucursalId
+          : undefined;
+      
+      const tipoFiltro = selectedSucursalId ? filtroTipo : "ambos";
+      
       const res = await getEstadisticasDashboard({
         periodo: "mes",
-        sucursalId:
-          session?.user?.role === "SUPER_ADMIN" &&
-          sucursalId &&
-          sucursalId !== "ALL"
-            ? sucursalId
-            : undefined,
+        sucursalId: selectedSucursalId,
+        filtroTipo: tipoFiltro,
+        mes: mesSeleccionado,
       });
-      if (res?.success) setTrend(res.data);
-    } catch (e) {}
-  };
+      
+      if (res?.success) {
+        setTrend(res.data);
+      } else {
+        console.error("Error al cargar tendencia:", res?.error);
+      }
+    } catch (e) {
+      console.error("Error al cargar tendencia:", e);
+    }
+  }, [session, sucursalId, filtroTipo, mesSeleccionado]);
+
+  // Función para actualizar manualmente
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await Promise.all([fetchKpis(false), fetchTrend()]);
+      toast.success("Datos actualizados");
+    } catch (error) {
+      console.error("Error al actualizar:", error);
+    } finally {
+      setRefreshing(false);
+    }
+  }, [fetchKpis, fetchTrend]);
 
   const recientes = kpis?.enviosRecientes || [];
 
-  const estadosData = Object.entries(kpis?.estadisticasPorEstado || {}).map(
-    ([estado, cantidad]) => ({ estado, cantidad })
-  );
+  // Usar estadísticas del mes seleccionado desde trend, o del mes actual desde kpis
+  const estadosData = trend?.enviosPorEstado?.length
+    ? trend.enviosPorEstado.map((item) => ({
+        estado: item.estado,
+        cantidad: item.cantidad,
+      }))
+    : Object.entries(kpis?.estadisticasPorEstado || {}).map(
+        ([estado, cantidad]) => ({ estado, cantidad })
+      );
 
   const chartConfig = estadosData.reduce((acc, item, idx) => {
     acc[item.estado] = {
@@ -119,9 +284,11 @@ export default function DashboardPage() {
         sucursales={sucursales}
         sucursalId={sucursalId}
         setSucursalId={setSucursalId}
-        fetchKpis={fetchKpis}
-        fetchTrend={fetchTrend}
-        fetchSucursales={cargarSucursales}
+        filtroTipo={filtroTipo}
+        setFiltroTipo={setFiltroTipo}
+        onRefresh={handleRefresh}
+        refreshing={refreshing}
+        ultimaActualizacion={ultimaActualizacion}
       />
 
       {/* KPIs Principales */}
@@ -166,7 +333,12 @@ export default function DashboardPage() {
       </div>
 
       {/* Tendencia de Ingresos */}
-      <TendenciaIngresos trend={trend} />
+      <TendenciaIngresos 
+        trend={trend} 
+        mesSeleccionado={mesSeleccionado}
+        setMesSeleccionado={setMesSeleccionado}
+        mesesDisponibles={mesesDisponibles}
+      />
 
       {/* Recientes y Distribución */}
       <div className="grid gap-4 lg:grid-cols-2">
@@ -174,7 +346,13 @@ export default function DashboardPage() {
         <Recientes recientes={recientes} />
 
         {/* Distribución por Estado */}
-        <Distribucion estadosData={estadosData} chartConfig={chartConfig} />
+        <Distribucion 
+          estadosData={estadosData} 
+          chartConfig={chartConfig}
+          mesSeleccionado={mesSeleccionado}
+          setMesSeleccionado={setMesSeleccionado}
+          mesesDisponibles={mesesDisponibles}
+        />
       </div>
 
       {/* Acciones Rápidas */}

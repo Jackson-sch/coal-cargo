@@ -15,6 +15,13 @@ import HeaderReportes from "@/components/reportes/header";
 import KPIsReportes from "@/components/reportes/kpis-reportes";
 import TablaFiltrosReportes from "@/components/reportes/tabla-filtros-reportes";
 import FiltrosReportes from "@/components/reportes/filtros-reportes";
+import {
+  useGuia,
+  useEstadoFilter,
+  useFechaFilter,
+  usePage,
+} from "@/hooks/useQueryParams";
+
 const ITEMS_PER_PAGE = 8;
 export default function ReportesPage() {
   const [loading, setLoading] = useState(true);
@@ -22,13 +29,15 @@ export default function ReportesPage() {
   const [total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
   const { empresaConfig } = useEmpresaConfig();
-  // Búsqueda en tiempo real: estado del input se actualiza inmediatamente
-  const [searchQuery, setSearchQuery] = useState("");
+
+  // Query params con nuqs (sincronizados con URL)
+  const [searchQuery, setSearchQuery] = useGuia("");
+  const [estado, setEstado] = useEstadoFilter("todos");
+  const [fechaFiltro, setFechaFiltro] = useFechaFilter("todos");
+  const [currentPage, setCurrentPage] = usePage(1);
+
   // Debounce corto para optimizar llamadas API (300ms)
   const searchQueryDebounced = useDebounce(searchQuery, 300);
-  const [estado, setEstado] = useState("todos");
-  const [fechaFiltro, setFechaFiltro] = useState("todos");
-  const [currentPage, setCurrentPage] = useState(1);
 
   const formatEstadoLabel = (val) => {
     if (!val || val === "todos") return "Todos";
@@ -93,15 +102,16 @@ export default function ReportesPage() {
   }, [searchQueryDebounced, estado, fechaFiltro]);
 
   const handleSearch = (value) => {
-    setSearchQuery(value);
+    setSearchQuery(value || null); // null elimina el query param de la URL
     // La página se resetea automáticamente cuando searchQueryDebounced cambie
   };
   const handleEstado = (value) => {
-    setEstado(value);
+    setEstado(value === "todos" ? null : value); // null para "todos" elimina el param
     setCurrentPage(1);
   };
+
   const handleFechaFiltro = (value) => {
-    setFechaFiltro(value);
+    setFechaFiltro(value === "todos" ? null : value); // null para "todos" elimina el param
     setCurrentPage(1);
   };
 

@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
+import { useSession } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -48,7 +49,6 @@ import {
   getEstadisticasEnvios,
 } from "@/lib/actions/envios";
 import { getSucursales } from "@/lib/actions/sucursales";
-import { getClientes } from "@/lib/actions/clientes";
 import { getUsuarios } from "@/lib/actions/usuarios";
 import { calcularCotizacionSucursal } from "@/lib/actions/cotizacion-sucursales";
 import HeaderEnvios from "@/components/envios/header";
@@ -60,33 +60,148 @@ import ModalDetalle from "@/components/envios/modal-detalle";
 import ModalActualizarEstado from "@/components/envios/modal-actualizar-estado";
 import ModalAsignarUsuario from "@/components/envios/modal-asignar-usuario";
 import { estadosEnvioArray, modalidadesArray } from "@/lib/constants/estados";
+import { useCopiarGuia } from "@/hooks/useCopiarGuia";
+import {
+  useGuia,
+  useSucursalOrigen,
+  useSucursalDestino,
+  useCliente,
+  usePage,
+  useFechaDesde,
+  useFechaHasta,
+} from "@/hooks/useQueryParams";
+import { useQueryState, parseAsString } from "nuqs";
+import { useMemo } from "react";
 
 const estadosEnvio = estadosEnvioArray;
 const modalidades = modalidadesArray;
 export default function EnviosPage() {
+  const { data: session } = useSession();
+  const userRole = session?.user?.role;
+  const isSuperAdmin = userRole === "SUPER_ADMIN";
+
   const [loading, setLoading] = useState(false);
   const [envios, setEnvios] = useState([]);
   const [estadisticas, setEstadisticas] = useState(null);
   const [pagination, setPagination] = useState(null);
   const [sucursales, setSucursales] = useState([]);
-  const [clientes, setClientes] = useState([]);
   const [usuarios, setUsuarios] = useState([]); // Estados de modale s
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [showStatusModal, setShowStatusModal] = useState(false);
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [selectedEnvio, setSelectedEnvio] = useState(null);
-  const [saving, setSaving] = useState(false); // Estado para el botón de copi a
-  const [copiedGuia, setCopiedGuia] = useState(null); // Filtro s
-  const [filtros, setFiltros] = useState({
-    estado: "all-states",
-    sucursalOrigenId: "all-branches",
-    sucursalDestinoId: "all-branches",
-    clienteId: "all-clients",
-    numeroGuia: "",
-    fechaRango: { from: null, to: null },
-    page: 1,
-  }); // Formulario de nuevo enví o
+  const [saving, setSaving] = useState(false);
+
+  // Hook para copiar número de guía
+  const { copiarNumeroGuia, copiedGuia } = useCopiarGuia();
+
+  // Query params con nuqs (sincronizados con URL)
+  const [numeroGuia, setNumeroGuia] = useGuia("");
+  const [busquedaUrl, setBusquedaUrl] = useQueryState(
+    "busqueda",
+    parseAsString.withDefault("")
+  );
+  const [estadoUrl, setEstadoUrl] = useQueryState(
+    "estado",
+    parseAsString.withDefault(null)
+  );
+  const [sucursalOrigenIdUrl, setSucursalOrigenIdUrl] = useSucursalOrigen(null);
+  const [sucursalDestinoIdUrl, setSucursalDestinoIdUrl] =
+    useSucursalDestino(null);
+  const [clienteIdUrl, setClienteIdUrl] = useCliente(null);
+  const [page, setPage] = usePage(1);
+  const [fechaDesde, setFechaDesde] = useFechaDesde(null);
+  const [fechaHasta, setFechaHasta] = useFechaHasta(null);
+
+  // Construir objeto filtros desde los hooks (para mantener compatibilidad con componentes existentes)
+  const filtros = useMemo(
+    () => ({
+      estado: estadoUrl || "all-states",
+      sucursalOrigenId: sucursalOrigenIdUrl || "all-branches",
+      sucursalDestinoId: sucursalDestinoIdUrl || "all-branches",
+      clienteId: clienteIdUrl || "all-clients",
+      numeroGuia: numeroGuia || "",
+      busqueda: busquedaUrl || "",
+      fechaRango: {
+        from: fechaDesde ? new Date(fechaDesde) : null,
+        to: fechaHasta ? new Date(fechaHasta) : null,
+      },
+      fechaDesde: fechaDesde || null,
+      fechaHasta: fechaHasta || null,
+      page,
+    }),
+    [
+      estadoUrl,
+      sucursalOrigenIdUrl,
+      sucursalDestinoIdUrl,
+      clienteIdUrl,
+      numeroGuia,
+      busquedaUrl,
+      fechaDesde,
+      fechaHasta,
+      page,
+    ]
+  );
+
+  // Función para actualizar filtros (mantiene compatibilidad)
+  const setFiltros = (newFiltrosOrUpdater) => {
+    const newFiltros =
+      typeof newFiltrosOrUpdater === "function"
+        ? newFiltrosOrUpdater(filtros)
+        : newFiltrosOrUpdater;
+
+    if (newFiltros.estado !== undefined) {
+      setEstadoUrl(
+        newFiltros.estado === "all-states" ? null : newFiltros.estado
+      );
+    }
+    if (newFiltros.sucursalOrigenId !== undefined) {
+      setSucursalOrigenIdUrl(
+        newFiltros.sucursalOrigenId === "all-branches"
+          ? null
+          : newFiltros.sucursalOrigenId
+      );
+    }
+    if (newFiltros.sucursalDestinoId !== undefined) {
+      setSucursalDestinoIdUrl(
+        newFiltros.sucursalDestinoId === "all-branches"
+          ? null
+          : newFiltros.sucursalDestinoId
+      );
+    }
+    if (newFiltros.clienteId !== undefined) {
+      setClienteIdUrl(
+        newFiltros.clienteId === "all-clients" ? null : newFiltros.clienteId
+      );
+    }
+    if (newFiltros.numeroGuia !== undefined) {
+      setNumeroGuia(newFiltros.numeroGuia || null);
+    }
+    if (newFiltros.busqueda !== undefined) {
+      setBusquedaUrl(newFiltros.busqueda || null);
+      // Si hay búsqueda, limpiar número de guía y clienteId
+      if (newFiltros.busqueda) {
+        setNumeroGuia(null);
+        setClienteIdUrl(null);
+      }
+    }
+    if (newFiltros.page !== undefined) {
+      setPage(newFiltros.page);
+    }
+    if (newFiltros.fechaRango) {
+      setFechaDesde(
+        newFiltros.fechaRango.from
+          ? newFiltros.fechaRango.from.toISOString().split("T")[0]
+          : null
+      );
+      setFechaHasta(
+        newFiltros.fechaRango.to
+          ? newFiltros.fechaRango.to.toISOString().split("T")[0]
+          : null
+      );
+    }
+  }; // Formulario de nuevo enví o
   const [formData, setFormData] = useState({
     clienteId: "",
     sucursalOrigenId: "",
@@ -110,7 +225,7 @@ export default function EnviosPage() {
     destinatarioDireccion: "",
   }); // Estado para cotización previ a
   const [cotizacionPrevia, setCotizacionPrevia] = useState(null);
-  const [calculandoCotizacion, setCalculandoCotizacion] = useState(false);   // Estados para actualización de estad o
+  const [calculandoCotizacion, setCalculandoCotizacion] = useState(false); // Estados para actualización de estad o
   const [nuevoEstado, setNuevoEstado] = useState("");
   const [descripcionEvento, setDescripcionEvento] = useState("");
   const [ubicacionEvento, setUbicacionEvento] = useState("");
@@ -132,26 +247,15 @@ export default function EnviosPage() {
         setEstadisticas(estadisticasResult.data);
       }
     } catch (error) {}
-  }; // Función para copiar número de guí a
-  const copiarNumeroGuia = async (numeroGuia) => {
-    try {
-      await navigator.clipboard.writeText(numeroGuia);
-      setCopiedGuia(numeroGuia);
-      toast.success(`Número de guía ${numeroGuia} copiado al portapapeles`); // Resetear el estado después de 2 segundo s
-      setTimeout(() => {
-        setCopiedGuia(null);
-      }, 2000);
-    } catch (error) {
-      toast.error("Error al copiar el número de guía");
-    }
   };
+
   const cargarDatosIniciales = async () => {
     try {
-      const [sucursalesResult, clientesResult, usuariosResult] =
-        await Promise.all([getSucursales(), getClientes(), getUsuarios()]);
+      const [sucursalesResult, usuariosResult] =
+        await Promise.all([getSucursales(), getUsuarios()]);
       if (sucursalesResult.success) setSucursales(sucursalesResult.data);
-      if (clientesResult.success) setClientes(clientesResult.data);
       if (usuariosResult.success) setUsuarios(usuariosResult.data);
+      // Ya no cargamos todos los clientes, se buscarán dinámicamente
     } catch (error) {}
   };
   const cargarEnvios = async () => {
@@ -390,7 +494,7 @@ export default function EnviosPage() {
         setFiltros={setFiltros}
         estadosEnvio={estadosEnvio}
         sucursales={sucursales}
-        clientes={clientes}
+        isSuperAdmin={isSuperAdmin}
       />
 
       {/* Tabla de Envíos */}

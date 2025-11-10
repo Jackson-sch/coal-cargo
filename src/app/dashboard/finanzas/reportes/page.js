@@ -1,7 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useState, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
@@ -40,12 +39,38 @@ import {
 import { Input } from "@/components/ui/input";
 import { getSucursales } from "@/lib/actions/sucursales";
 import { getClientes } from "@/lib/actions/clientes";
+import { useFechaDesde, useFechaHasta } from "@/hooks/useQueryParams";
 
 export default function ReportesFinancierosPage() {
-  const router = useRouter();
-  const searchParams = useSearchParams();
   const [loading, setLoading] = useState(false);
-  const [rangoFechas, setRangoFechas] = useState(undefined);
+
+  // Query params con nuqs (sincronizados con URL)
+  const [fechaDesde, setFechaDesde] = useFechaDesde(null);
+  const [fechaHasta, setFechaHasta] = useFechaHasta(null);
+
+  // Construir objeto rangoFechas desde los hooks (para mantener compatibilidad)
+  const rangoFechas = useMemo(() => {
+    if (!fechaDesde && !fechaHasta) return undefined;
+    return {
+      from: fechaDesde ? new Date(fechaDesde) : null,
+      to: fechaHasta
+        ? new Date(fechaHasta)
+        : fechaDesde
+        ? new Date(fechaDesde)
+        : null,
+    };
+  }, [fechaDesde, fechaHasta]);
+
+  // Función para actualizar rangoFechas (mantiene compatibilidad)
+  const setRangoFechas = (rango) => {
+    if (!rango) {
+      setFechaDesde(null);
+      setFechaHasta(null);
+      return;
+    }
+    setFechaDesde(rango.from ? rango.from.toISOString().split("T")[0] : null);
+    setFechaHasta(rango.to ? rango.to.toISOString().split("T")[0] : null);
+  };
   const [resumen, setResumen] = useState({
     totalPagos: 0,
     totalEnvios: 0,
@@ -69,42 +94,7 @@ export default function ReportesFinancierosPage() {
   const [clienteQuery, setClienteQuery] = useState("");
   const [clienteOptions, setClienteOptions] = useState([]);
 
-  // Inicializar desde URL
-  useEffect(() => {
-    try {
-      const from = searchParams.get("from");
-      const to = searchParams.get("to");
-      let rango;
-      if (from && to) {
-        rango = { from: new Date(from), to: new Date(to) };
-      } else if (from && !to) {
-        rango = { from: new Date(from), to: new Date(from) };
-      }
-      setRangoFechas(rango);
-    } catch {}
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // Sincronizar URL cuando cambie el rango
-  useEffect(() => {
-    // Solo sincronizar si hay rango definido y el QS cambia, para evitar navegaciones redundantes
-    if (!rangoFechas?.from) return;
-    const params = new URLSearchParams();
-    const f = rangoFechas.from;
-    const t = rangoFechas.to || rangoFechas.from;
-    const fmt = (d) =>
-      `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
-        d.getDate()
-      ).padStart(2, "0")}`;
-    params.set("from", fmt(f));
-    params.set("to", fmt(t));
-    const qs = params.toString();
-    const currentQs = searchParams?.toString?.() || "";
-    if (qs !== currentQs) {
-      router.replace(`/dashboard/finanzas/reportes?${qs}`);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rangoFechas, searchParams]);
+  // Los query params ahora se sincronizan automáticamente con nuqs
 
   // Cargar listas auxiliares
   useEffect(() => {
@@ -270,7 +260,7 @@ export default function ReportesFinancierosPage() {
   };
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
+    <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold flex items-center gap-2">
@@ -413,10 +403,15 @@ export default function ReportesFinancierosPage() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="ALL">Todos</SelectItem>
-                    <SelectItem value="REGISTRADO">REGISTRADO</SelectItem>
-                    <SelectItem value="EN_TRANSITO">EN_TRANSITO</SelectItem>
-                    <SelectItem value="ENTREGADO">ENTREGADO</SelectItem>
-                    <SelectItem value="CANCELADO">CANCELADO</SelectItem>
+                    <SelectItem value="REGISTRADO">Registrado</SelectItem>
+                    <SelectItem value="EN_BODEGA">En Bodega</SelectItem>
+                    <SelectItem value="EN_AGENCIA_ORIGEN">En Agencia Origen</SelectItem>
+                    <SelectItem value="EN_TRANSITO">En Tránsito</SelectItem>
+                    <SelectItem value="EN_AGENCIA_DESTINO">En Agencia Destino</SelectItem>
+                    <SelectItem value="EN_REPARTO">En Reparto</SelectItem>
+                    <SelectItem value="ENTREGADO">Entregado</SelectItem>
+                    <SelectItem value="DEVUELTO">Devuelto</SelectItem>
+                    <SelectItem value="ANULADO">Anulado</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

@@ -1,7 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -48,6 +47,7 @@ import {
   Printer,
   X,
   Loader2,
+  Mail,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -59,6 +59,15 @@ import {
 import { useEmpresaConfig } from "@/hooks/use-empresa-config";
 import { useDebounce } from "@/hooks/useDebounce";
 import ModalRegistroPagoMejorado from "@/components/pagos/modal-registro-pago-mejorado";
+import {
+  useEstadoFilter,
+  useMetodoPago,
+  useBusqueda,
+  useFechaDesde,
+  useFechaHasta,
+  usePage,
+} from "@/hooks/useQueryParams";
+import { useQueryState, parseAsBoolean, parseAsString } from "nuqs";
 
 const estadosPago = [
   {
@@ -93,25 +102,81 @@ const metodosPago = [
 ];
 
 export default function PagosPage() {
-  const router = useRouter();
-  const searchParams = useSearchParams();
   const { empresaConfig } = useEmpresaConfig();
 
   const [loading, setLoading] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [guardando, setGuardando] = useState(false);
 
-  const [filtros, setFiltros] = useState({
-    estado: "ALL",
-    metodo: "ALL",
-    busqueda: "",
-    rangoFechas: undefined,
-    conSaldo: false,
-  });
-
-  // Paginación
-  const [page, setPage] = useState(1);
+  // Query params con nuqs (sincronizados con URL)
+  const [estado, setEstado] = useQueryState(
+    "estadoPago",
+    parseAsString.withDefault("ALL")
+  );
+  const [metodo, setMetodo] = useMetodoPago("ALL");
+  const [busqueda, setBusqueda] = useBusqueda("");
+  const [fechaDesde, setFechaDesde] = useFechaDesde(null);
+  const [fechaHasta, setFechaHasta] = useFechaHasta(null);
+  const [conSaldo, setConSaldo] = useQueryState(
+    "conSaldo",
+    parseAsBoolean.withDefault(false)
+  );
+  const [page, setPage] = usePage(1);
   const [limit, setLimit] = useState(20);
+
+  // Debounce para búsqueda (mantiene el comportamiento existente)
+  const busquedaDebounced = useDebounce(busqueda, 400);
+
+  // Construir objeto filtros desde los hooks (para mantener compatibilidad)
+  const filtros = useMemo(
+    () => ({
+      estado,
+      metodo,
+      busqueda: busquedaDebounced,
+      rangoFechas:
+        fechaDesde || fechaHasta
+          ? {
+              from: fechaDesde ? new Date(fechaDesde) : null,
+              to: fechaHasta ? new Date(fechaHasta) : null,
+            }
+          : undefined,
+      conSaldo,
+    }),
+    [estado, metodo, busquedaDebounced, fechaDesde, fechaHasta, conSaldo]
+  );
+
+  // Función para actualizar filtros (mantiene compatibilidad)
+  const setFiltros = (newFiltrosOrUpdater) => {
+    const newFiltros =
+      typeof newFiltrosOrUpdater === "function"
+        ? newFiltrosOrUpdater(filtros)
+        : newFiltrosOrUpdater;
+
+    if (newFiltros.estado !== undefined) {
+      setEstado(newFiltros.estado === "ALL" ? null : newFiltros.estado);
+    }
+    if (newFiltros.metodo !== undefined) {
+      setMetodo(newFiltros.metodo === "ALL" ? null : newFiltros.metodo);
+    }
+    if (newFiltros.busqueda !== undefined) {
+      setBusqueda(newFiltros.busqueda || null);
+    }
+    if (newFiltros.conSaldo !== undefined) {
+      setConSaldo(newFiltros.conSaldo || null);
+    }
+    if (newFiltros.rangoFechas) {
+      setFechaDesde(
+        newFiltros.rangoFechas.from
+          ? newFiltros.rangoFechas.from.toISOString().split("T")[0]
+          : null
+      );
+      setFechaHasta(
+        newFiltros.rangoFechas.to
+          ? newFiltros.rangoFechas.to.toISOString().split("T")[0]
+          : null
+      );
+    }
+  };
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
   const [pagos, setPagos] = useState([]);
@@ -140,7 +205,6 @@ export default function PagosPage() {
   const [envioOpen, setEnvioOpen] = useState(false);
   const [envioQuery, setEnvioQuery] = useState("");
   const envioQueryDebounced = useDebounce(envioQuery, 300);
-  const busquedaDebounced = useDebounce(filtros.busqueda, 400);
   const [envioOptions, setEnvioOptions] = useState([]);
   const [montoEditable, setMontoEditable] = useState(false);
   const [envioResumen, setEnvioResumen] = useState(null);
@@ -292,6 +356,29 @@ export default function PagosPage() {
     }
   };
 
+  // Reenviar email de confirmación de pago
+  const reenviarEmailPago = async (pagoId) => {
+    try {
+      setImprimiendoId(pagoId);
+      const { enviarEmailPagoRegistrado } = await import(
+        "@/lib/utils/enviar-email-comprobante"
+      );
+
+      const resultado = await enviarEmailPagoRegistrado(pagoId);
+
+      if (resultado.success) {
+        toast.success("Email reenviado correctamente");
+      } else {
+        toast.error(resultado.error || "Error al reenviar email");
+      }
+    } catch (error) {
+      console.error("Error al reenviar email:", error);
+      toast.error("Error al reenviar email");
+    } finally {
+      setImprimiendoId(null);
+    }
+  };
+
   // Efectos
   useEffect(() => {
     cargarPagos();
@@ -396,13 +483,11 @@ export default function PagosPage() {
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
                   placeholder="Cliente, envío, referencia..."
-                  value={filtros.busqueda}
-                  onChange={(e) =>
-                    setFiltros((prev) => ({
-                      ...prev,
-                      busqueda: e.target.value,
-                    }))
-                  }
+                  value={busqueda}
+                  onChange={(e) => {
+                    setBusqueda(e.target.value || null);
+                    setPage(1);
+                  }}
                   className="pl-10"
                 />
               </div>
@@ -411,19 +496,20 @@ export default function PagosPage() {
             <div>
               <Label>Estado</Label>
               <Select
-                value={filtros.estado}
-                onValueChange={(value) =>
-                  setFiltros((prev) => ({ ...prev, estado: value }))
-                }
+                value={estado}
+                onValueChange={(value) => {
+                  setEstado(value === "ALL" ? null : value);
+                  setPage(1);
+                }}
               >
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="ALL">Todos</SelectItem>
-                  {estadosPago.map((estado) => (
-                    <SelectItem key={estado.value} value={estado.value}>
-                      {estado.label}
+                  {estadosPago.map((estadoItem) => (
+                    <SelectItem key={estadoItem.value} value={estadoItem.value}>
+                      {estadoItem.label}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -433,19 +519,20 @@ export default function PagosPage() {
             <div>
               <Label>Método</Label>
               <Select
-                value={filtros.metodo}
-                onValueChange={(value) =>
-                  setFiltros((prev) => ({ ...prev, metodo: value }))
-                }
+                value={metodo}
+                onValueChange={(value) => {
+                  setMetodo(value === "ALL" ? null : value);
+                  setPage(1);
+                }}
               >
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="ALL">Todos</SelectItem>
-                  {metodosPago.map((metodo) => (
-                    <SelectItem key={metodo.value} value={metodo.value}>
-                      {metodo.label}
+                  {metodosPago.map((metodoItem) => (
+                    <SelectItem key={metodoItem.value} value={metodoItem.value}>
+                      {metodoItem.label}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -455,10 +542,11 @@ export default function PagosPage() {
             <div className="flex items-center space-x-2 mt-6">
               <Switch
                 id="con-saldo"
-                checked={filtros.conSaldo}
-                onCheckedChange={(checked) =>
-                  setFiltros((prev) => ({ ...prev, conSaldo: checked }))
-                }
+                checked={conSaldo}
+                onCheckedChange={(checked) => {
+                  setConSaldo(checked || null);
+                  setPage(1);
+                }}
               />
               <Label htmlFor="con-saldo">Con saldo pendiente</Label>
             </div>
@@ -466,15 +554,15 @@ export default function PagosPage() {
             <div className="flex items-end">
               <Button
                 variant="outline"
-                onClick={() =>
-                  setFiltros({
-                    estado: "ALL",
-                    metodo: "ALL",
-                    busqueda: "",
-                    rangoFechas: undefined,
-                    conSaldo: false,
-                  })
-                }
+                onClick={() => {
+                  setEstado(null);
+                  setMetodo(null);
+                  setBusqueda(null);
+                  setFechaDesde(null);
+                  setFechaHasta(null);
+                  setConSaldo(null);
+                  setPage(1);
+                }}
               >
                 Limpiar
               </Button>
@@ -572,6 +660,19 @@ export default function PagosPage() {
                                   <Loader2 className="h-4 w-4 animate-spin" />
                                 ) : (
                                   <Printer className="h-4 w-4" />
+                                )}
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => reenviarEmailPago(pago.id)}
+                                disabled={imprimiendoId === pago.id}
+                                title="Reenviar email"
+                              >
+                                {imprimiendoId === pago.id ? (
+                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : (
+                                  <Mail className="h-4 w-4" />
                                 )}
                               </Button>
                             </div>

@@ -244,6 +244,14 @@ export async function registrarPago(data) {
       },
     });
 
+    // Enviar email de confirmación de pago
+    const { enviarEmailPagoRegistrado } = await import(
+      "@/lib/utils/enviar-email-comprobante"
+    );
+    enviarEmailPagoRegistrado(nuevoPago.id).catch((error) => {
+      console.error("Error al enviar email de pago registrado:", error);
+    });
+
     // Revalidar páginas relacionadas
     revalidatePath("/dashboard/pagos");
     revalidatePath("/dashboard/envios");

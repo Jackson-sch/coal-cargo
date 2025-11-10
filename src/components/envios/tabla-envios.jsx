@@ -250,7 +250,13 @@ export default function TablaEnvios({
                       <TableCell className="font-medium">
                         {formatSoles(envio.precio)}
                       </TableCell>
-                      <TableCell>{formatDate(envio.createdAt)}</TableCell>
+                      <TableCell>
+                        {envio.fechaRegistro 
+                          ? formatDate(envio.fechaRegistro) 
+                          : envio.createdAt 
+                            ? formatDate(envio.createdAt) 
+                            : "N/A"}
+                      </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">
                           <Button

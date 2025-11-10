@@ -74,12 +74,6 @@ const ESTADOS_ENVIO_BASE = {
     color: "bg-red-100 text-red-800",
     description: "El envío ha sido anulado",
   },
-  CANCELADO: {
-    label: "Cancelado",
-    icon: AlertCircle,
-    color: "bg-gray-100 text-gray-800",
-    description: "El envío ha sido cancelado",
-  },
 };
 
 // Configuración base de modalidades
@@ -98,15 +92,29 @@ const TIPOS_SERVICIO_BASE = {
   ECONOMICO: "Económico",
 };
 
+// Estados válidos según el enum de Prisma (EstadoEnvio)
+export const ESTADOS_ENVIO_VALIDOS = [
+  "REGISTRADO",
+  "EN_BODEGA",
+  "EN_AGENCIA_ORIGEN",
+  "EN_TRANSITO",
+  "EN_AGENCIA_DESTINO",
+  "EN_REPARTO",
+  "ENTREGADO",
+  "DEVUELTO",
+  "ANULADO",
+];
+
 // Formato para arrays (usado en Select, Filtros, etc.)
-export const estadosEnvioArray = Object.keys(ESTADOS_ENVIO_BASE).map(
-  (key) => ({
+// Solo incluye estados válidos según Prisma
+export const estadosEnvioArray = Object.keys(ESTADOS_ENVIO_BASE)
+  .filter((key) => ESTADOS_ENVIO_VALIDOS.includes(key))
+  .map((key) => ({
     value: key,
     label: ESTADOS_ENVIO_BASE[key].label,
     color: ESTADOS_ENVIO_BASE[key].color,
     icon: ESTADOS_ENVIO_BASE[key].icon,
-  })
-);
+  }));
 
 // Formato para objetos (usado en seguimiento, configuración, etc.)
 export const estadosEnvioObject = ESTADOS_ENVIO_BASE;

@@ -4,6 +4,8 @@ const { seedConfiguracionInicial } = require("../src/lib/seeds/configuracion-ini
 const { prisma } = require("../src/lib/prisma-cjs");
 const createTestUser = require("../src/lib/seeds/create-test-user");
 const seedClientes = require("./seed-clientes");
+const { seedSucursalesYTarifas } = require("../src/lib/seeds/sucursales-y-tarifas");
+const seedEnvios = require("./seed-envios");
 
 async function main() {
   console.log("🚀 Iniciando proceso de seeding...");
@@ -12,7 +14,9 @@ async function main() {
     await seedTarifasDestinoIniciales();
     await seedConfiguracionInicial();
     await createTestUser();
+    await seedSucursalesYTarifas();
     await seedClientes();
+    await seedEnvios();
     console.log("🎉 Proceso de seeding completado exitosamente");
   } catch (error) {
     console.error("💥 Error durante el seeding:", error);

@@ -28,6 +28,11 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import {
+  InputGroup,
+  InputGroupInput,
+  InputGroupButton,
+} from "@/components/ui/input-group";
 import { toast } from "sonner";
 import {
   Building2,
@@ -81,38 +86,47 @@ const clienteSchema = z
     distritoId: z.string().optional(),
     esEmpresa: z.boolean().default(false),
   })
-  .refine(
-    (data) => {
-      // Validaciones específicas por tipo de documento
-      if (data.tipoDocumento === "DNI" || data.tipoDocumento === "RUC") {
-        if (
-          !validarDocumentoPeruano(data.tipoDocumento, data.numeroDocumento)
-        ) {
-          return false;
-        }
-      } else if (data.tipoDocumento === "CARNET_EXTRANJERIA") {
-        if (data.numeroDocumento.length < 9) {
-          return false;
-        }
+  .superRefine((data, ctx) => {
+    // Validaciones específicas por tipo de documento
+    if (data.tipoDocumento === "DNI" || data.tipoDocumento === "RUC") {
+      if (!validarDocumentoPeruano(data.tipoDocumento, data.numeroDocumento)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message:
+            data.tipoDocumento === "RUC"
+              ? "RUC inválido. Verifica que tenga 11 dígitos y sea válido."
+              : "DNI inválido. Verifica que tenga 8 dígitos y sea válido.",
+          path: ["numeroDocumento"],
+        });
       }
-      // Si es empresa, debe tener razón social
-      if (data.esEmpresa && !data.razonSocial?.trim()) {
-        return false;
+    } else if (data.tipoDocumento === "CARNET_EXTRANJERIA") {
+      if (data.numeroDocumento.length < 9) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "El Carnet de Extranjería debe tener al menos 9 caracteres",
+          path: ["numeroDocumento"],
+        });
       }
-
-      // Si no es empresa, debe tener apellidos
-      if (!data.esEmpresa && !data.apellidos?.trim()) {
-        return false;
-      }
-
-      return true;
-    },
-    {
-      message:
-        "Datos inválidos para el tipo de documento o cliente seleccionado",
-      path: ["numeroDocumento"],
     }
-  );
+
+    // Si es empresa, debe tener razón social
+    if (data.esEmpresa && !data.razonSocial?.trim()) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "La razón social es requerida para empresas",
+        path: ["razonSocial"],
+      });
+    }
+
+    // Si no es empresa, debe tener apellidos
+    if (!data.esEmpresa && !data.apellidos?.trim()) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Los apellidos son requeridos para personas naturales",
+        path: ["apellidos"],
+      });
+    }
+  });
 
 export default function ClienteForm({ cliente, onSuccess }) {
   const [loading, setLoading] = useState(false);
@@ -550,6 +564,10 @@ export default function ClienteForm({ cliente, onSuccess }) {
     try {
       setLoading(true);
 
+      // Validar que todos los campos requeridos estén completos
+      const errors = [];
+
+      // Validar documento
       const tipoDoc = data.tipoDocumento;
       const numDoc = String(data.numeroDocumento || "").trim();
 
@@ -565,16 +583,72 @@ export default function ClienteForm({ cliente, onSuccess }) {
           type: "manual",
           message: msg,
         });
-        toast.error(msg);
+        errors.push(msg);
+      }
+
+      // Validar razón social para empresas
+      if (data.esEmpresa && !data.razonSocial?.trim()) {
+        form.setError("razonSocial", {
+          type: "manual",
+          message: "La razón social es requerida para empresas",
+        });
+        errors.push("La razón social es requerida");
+      }
+
+      // Validar apellidos para personas naturales
+      if (!data.esEmpresa && !data.apellidos?.trim()) {
+        form.setError("apellidos", {
+          type: "manual",
+          message: "Los apellidos son requeridos para personas naturales",
+        });
+        errors.push("Los apellidos son requeridos");
+      }
+
+      // Si hay errores, mostrar el primero y detener
+      if (errors.length > 0) {
+        toast.error(
+          errors[0] || "Por favor completa todos los campos requeridos"
+        );
         setLoading(false);
         return;
       }
 
+      // Normalizar datos antes de enviar al servidor
+      const normalizedData = {
+        ...data,
+        // Si es empresa y apellidos está vacío, enviar undefined
+        apellidos:
+          data.esEmpresa && !data.apellidos?.trim()
+            ? undefined
+            : data.apellidos?.trim() || undefined,
+        // Normalizar otros campos opcionales
+        email: data.email?.trim() || undefined,
+        direccion: data.direccion?.trim() || undefined,
+        razonSocial: data.razonSocial?.trim() || undefined,
+        distritoId: data.distritoId || undefined,
+      };
+
       let result;
       if (isEditing) {
-        result = await updateCliente(cliente.id, data);
+        result = await updateCliente(cliente.id, normalizedData);
       } else {
-        result = await createCliente(data);
+        result = await createCliente(normalizedData);
+        
+        // Si hay un error con clienteEliminadoId, mostrar mensaje especial
+        if (!result.success && result.clienteEliminadoId) {
+          // El error ya contiene un mensaje útil, pero podemos mejorarlo
+          toast.error(result.error, {
+            duration: 8000,
+            action: {
+              label: "Ver eliminados",
+              onClick: () => {
+                // Redirigir a la sección de clientes eliminados
+                window.location.href = `/dashboard/clientes?estado=deleted`;
+              },
+            },
+          });
+          return;
+        }
       }
 
       if (result.success) {
@@ -585,9 +659,75 @@ export default function ClienteForm({ cliente, onSuccess }) {
         // Pasar los datos del cliente y el indicador de edición al callback
         onSuccess?.(result.data, isEditing);
       } else {
-        toast.error(result.error || "Error al guardar cliente");
+        // Mostrar errores específicos del servidor
+        if (result.error) {
+          toast.error(result.error);
+
+          // Si el servidor devolvió el campo específico, marcarlo directamente
+          if (result.field) {
+            form.setError(result.field, {
+              type: "manual",
+              message: result.error,
+            });
+          } else {
+            // Intentar extraer el campo del error y marcarlo
+            const errorLower = result.error.toLowerCase();
+            if (
+              errorLower.includes("documento") ||
+              errorLower.includes("dni") ||
+              errorLower.includes("ruc")
+            ) {
+              form.setError("numeroDocumento", {
+                type: "manual",
+                message: result.error,
+              });
+            } else if (
+              errorLower.includes("razón social") ||
+              errorLower.includes("razon social")
+            ) {
+              form.setError("razonSocial", {
+                type: "manual",
+                message: result.error,
+              });
+            } else if (errorLower.includes("apellidos")) {
+              form.setError("apellidos", {
+                type: "manual",
+                message: result.error,
+              });
+            } else if (errorLower.includes("email")) {
+              form.setError("email", {
+                type: "manual",
+                message: result.error,
+              });
+            } else if (
+              errorLower.includes("teléfono") ||
+              errorLower.includes("telefono")
+            ) {
+              form.setError("telefono", {
+                type: "manual",
+                message: result.error,
+              });
+            }
+          }
+
+          // Si hay detalles de validación, marcar todos los campos con error
+          if (result.details && Array.isArray(result.details)) {
+            result.details.forEach((detail) => {
+              if (detail.path && detail.path.length > 0) {
+                const fieldName = detail.path[0];
+                form.setError(fieldName, {
+                  type: "manual",
+                  message: detail.message,
+                });
+              }
+            });
+          }
+        } else {
+          toast.error("Error al guardar cliente");
+        }
       }
     } catch (error) {
+      console.error("Error al guardar cliente:", error);
       toast.error("Error de conexión al guardar cliente");
     } finally {
       setLoading(false);
@@ -595,67 +735,83 @@ export default function ClienteForm({ cliente, onSuccess }) {
   };
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-        {/* Indicador de borrador automático */}
-        {hasUnsavedChanges && !isEditing && (
-          <Alert className="border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/20">
-            <RefreshCw className="h-4 w-4 text-amber-600" />
-            <AlertDescription className="text-amber-800 dark:text-amber-200">
-              <strong>Borrador automático:</strong> Tus cambios se guardan
-              automáticamente cada 30 segundos.
-            </AlertDescription>
-          </Alert>
-        )}
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+        {/* Indicadores de estado - Compactos */}
+        <div className="space-y-2">
+          {hasUnsavedChanges && !isEditing && (
+            <Alert className="border-amber-200 bg-amber-50/50 dark:border-amber-800 dark:bg-amber-950/20 items-center justify-center py-2">
+              <RefreshCw className="h-3.5 w-3.5 text-amber-600" />
+              <AlertDescription className="text-xs text-amber-800 dark:text-amber-200">
+                <strong>Auto-guardado activo:</strong> Los cambios se guardan
+                automáticamente cada 30 segundos.
+              </AlertDescription>
+            </Alert>
+          )}
 
-        {/* Información de datos consultados */}
-        {documentData && (
-          <Alert className="border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-950/20">
-            <CheckCircle className="h-4 w-4 text-green-600" />
-            <AlertDescription className="text-green-800 dark:text-green-200">
-              <strong>Datos verificados:</strong> La información fue obtenida
-              automáticamente de {tipoDocumento === "DNI" ? "RENIEC" : "SUNAT"}.
-              {tipoDocumento === "RUC" && documentData.estado && (
-                <span className="ml-2">
-                  Estado:
-                  <Badge variant="outline" className="ml-1">
+          {documentData && (
+            <Alert className="border-green-200 bg-green-50/50 dark:border-green-800 dark:bg-green-950/20 py-2">
+              <CheckCircle className="h-3.5 w-3.5 text-green-600" />
+              <AlertDescription className="text-xs text-green-800 dark:text-green-200">
+                <strong>Datos verificados:</strong> Información obtenida de{" "}
+                {tipoDocumento === "DNI" ? "RENIEC" : "SUNAT"}.
+                {tipoDocumento === "RUC" && documentData.estado && (
+                  <Badge variant="outline" className="ml-2 text-xs">
                     {documentData.estado}
                   </Badge>
-                </span>
-              )}
-            </AlertDescription>
-          </Alert>
-        )}
-
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 auto-rows-min">
-          {/* Tipo de cliente - Destacado en la parte superior */}
-          <Card className="lg:col-span-12 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/20 dark:to-indigo-950/20 border-blue-200 dark:border-blue-800">
-            <CardHeader className="pb-4">
-              <CardTitle className="flex items-center gap-2 text-blue-900 dark:text-blue-100">
-                {esEmpresa ? (
-                  <Building2 className="h-5 w-5" />
-                ) : (
-                  <User className="h-5 w-5" />
                 )}
-                Tipo de Cliente
-              </CardTitle>
-            </CardHeader>
+              </AlertDescription>
+            </Alert>
+          )}
+
+          {documentError && (
+            <Alert className="border-red-200 bg-red-50/50 dark:border-red-800 dark:bg-red-950/20 py-2">
+              <AlertCircle className="h-3.5 w-3.5 text-red-600" />
+              <AlertDescription className="text-xs text-red-800 dark:text-red-200">
+                {documentError}
+              </AlertDescription>
+            </Alert>
+          )}
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 auto-rows-min">
+          {/* Tipo de cliente - Compacto */}
+          <Card className="lg:col-span-12 border-border/50">
             <CardContent>
               <FormField
                 control={form.control}
                 name="esEmpresa"
                 render={({ field }) => (
-                  <FormItem className="flex flex-row items-center justify-between rounded-lg border border-blue-200 dark:border-blue-800 bg-white/50 dark:bg-blue-950/10 p-4">
-                    <div className="space-y-0.5">
-                      <FormLabel className="text-base font-medium">
-                        {field.value
-                          ? "Empresa / Persona Jurídica"
-                          : "Persona Natural"}
-                      </FormLabel>
-                      <FormDescription className="text-sm">
-                        {field.value
-                          ? "Cliente empresarial con RUC"
-                          : "Cliente individual con DNI, Pasaporte o C.E."}
-                      </FormDescription>
+                  <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4 bg-muted/30">
+                    <div className="space-y-1 flex items-center gap-3">
+                      <div
+                        className={`flex h-10 w-10 items-center justify-center rounded-lg ${
+                          field.value
+                            ? "bg-blue-100 dark:bg-blue-900/30"
+                            : "bg-purple-100 dark:bg-purple-900/30"
+                        }`}
+                      >
+                        {field.value ? (
+                          <Building2
+                            className={`h-5 w-5 ${
+                              field.value ? "text-blue-600" : "text-purple-600"
+                            }`}
+                          />
+                        ) : (
+                          <User className="h-5 w-5 text-purple-600" />
+                        )}
+                      </div>
+                      <div className="space-y-0.5">
+                        <FormLabel className="text-sm font-semibold">
+                          {field.value
+                            ? "Empresa / Persona Jurídica"
+                            : "Persona Natural"}
+                        </FormLabel>
+                        <FormDescription className="text-xs">
+                          {field.value
+                            ? "Cliente empresarial con RUC"
+                            : "Cliente individual con DNI, Pasaporte o C.E."}
+                        </FormDescription>
+                      </div>
                     </div>
                     <FormControl>
                       <Switch
@@ -670,11 +826,13 @@ export default function ClienteForm({ cliente, onSuccess }) {
             </CardContent>
           </Card>
 
-          {/* Información de identificación - Tarjeta principal */}
-          <Card className="lg:col-span-7 bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-950/20 dark:to-teal-950/20 border-emerald-200 dark:border-emerald-800">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-emerald-900 dark:text-emerald-100">
-                <FileText className="h-5 w-5" />
+          {/* Información de identificación */}
+          <Card className="lg:col-span-7 border-border/50">
+            <CardHeader className="pb-4">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
+                  <FileText className="h-4 w-4 text-primary" />
+                </div>
                 Información de Identificación
               </CardTitle>
             </CardHeader>
@@ -716,15 +874,26 @@ export default function ClienteForm({ cliente, onSuccess }) {
                       <FormLabel className="flex items-center gap-2">
                         Número de Documento
                         {puedeConsultarDocumento(tipoDocumento) && (
-                          <Badge variant="secondary" className="text-xs">
+                          <Badge
+                            variant="secondary"
+                            className="text-xs font-normal"
+                          >
                             <Info className="h-3 w-3 mr-1" />
                             Auto-consulta
                           </Badge>
                         )}
                       </FormLabel>
-                      <div className="flex gap-2">
-                        <FormControl>
-                          <Input
+                      <FormControl>
+                        <InputGroup
+                          className={
+                            documentData
+                              ? "border-green-500 dark:border-green-500 bg-green-50/50 dark:bg-green-950/20"
+                              : documentError
+                              ? "border-red-500 dark:border-red-500 bg-red-50/50 dark:bg-red-950/20"
+                              : ""
+                          }
+                        >
+                          <InputGroupInput
                             placeholder={
                               tipoDocumento === "DNI"
                                 ? "12345678"
@@ -742,13 +911,6 @@ export default function ClienteForm({ cliente, onSuccess }) {
                                 : undefined
                             }
                             {...field}
-                            className={
-                              documentData
-                                ? "border-green-500 bg-green-50"
-                                : documentError
-                                ? "border-red-500 bg-red-50"
-                                : ""
-                            }
                             onChange={(e) => {
                               const digits = e.target.value.replace(/\D/g, "");
                               const limit =
@@ -759,50 +921,44 @@ export default function ClienteForm({ cliente, onSuccess }) {
                                   : digits.length;
                               field.onChange(digits.slice(0, limit));
                             }}
+                            aria-invalid={documentError ? "true" : undefined}
                           />
-                        </FormControl>
-                        {puedeConsultarDocumento(tipoDocumento) &&
-                          field.value && (
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="icon"
-                              onClick={() =>
-                                consultarDocumentoAutomatico(
-                                  tipoDocumento,
-                                  field.value
-                                )
-                              }
-                              disabled={consultingDocument}
-                              className="shrink-0"
-                            >
-                              {consultingDocument ? (
-                                <Loader2 className="h-4 w-4 animate-spin" />
-                              ) : (
-                                <Search className="h-4 w-4" />
-                              )}
-                            </Button>
-                          )}
-                      </div>
+                          {puedeConsultarDocumento(tipoDocumento) &&
+                            field.value && (
+                              <InputGroupButton
+                                type="button"
+                                align="inline-end"
+                                size="icon-sm"
+                                onClick={() =>
+                                  consultarDocumentoAutomatico(
+                                    tipoDocumento,
+                                    field.value
+                                  )
+                                }
+                                disabled={consultingDocument}
+                              >
+                                {consultingDocument ? (
+                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : (
+                                  <Search className="h-4 w-4" />
+                                )}
+                              </InputGroupButton>
+                            )}
+                        </InputGroup>
+                      </FormControl>
 
-                      {/* Indicadores de estado */}
+                      {/* Indicadores de estado - Más compactos */}
                       {consultingDocument && (
-                        <div className="flex items-center gap-2 text-sm text-blue-600">
-                          <Loader2 className="h-4 w-4 animate-spin" />
+                        <p className="flex items-center gap-1.5 text-xs text-blue-600">
+                          <Loader2 className="h-3 w-3 animate-spin" />
                           Consultando {tipoDocumento}...
-                        </div>
+                        </p>
                       )}
-                      {documentData && (
-                        <div className="flex items-center gap-2 text-sm text-green-600">
-                          <CheckCircle className="h-4 w-4" />
+                      {documentData && !consultingDocument && (
+                        <p className="flex items-center gap-1.5 text-xs text-green-600">
+                          <CheckCircle className="h-3 w-3" />
                           Datos obtenidos correctamente
-                        </div>
-                      )}
-                      {documentError && (
-                        <div className="flex items-center gap-2 text-sm text-red-600">
-                          <AlertCircle className="h-4 w-4" />
-                          {documentError}
-                        </div>
+                        </p>
                       )}
                       <FormMessage />
                     </FormItem>
@@ -820,9 +976,12 @@ export default function ClienteForm({ cliente, onSuccess }) {
                         <FormLabel className="flex items-center gap-2">
                           Razón Social *
                           {documentData && documentData.razonSocial && (
-                            <Badge variant="secondary" className="text-xs">
+                            <Badge
+                              variant="secondary"
+                              className="text-xs font-normal"
+                            >
                               <CheckCircle className="h-3 w-3 mr-1" />
-                              Verificado SUNAT
+                              Verificado
                             </Badge>
                           )}
                         </FormLabel>
@@ -832,7 +991,7 @@ export default function ClienteForm({ cliente, onSuccess }) {
                             {...field}
                             className={
                               documentData && documentData.razonSocial
-                                ? "border-green-500 bg-green-50"
+                                ? "border-green-500 dark:border-green-500 bg-green-50/50 dark:bg-green-950/20"
                                 : ""
                             }
                           />
@@ -895,7 +1054,10 @@ export default function ClienteForm({ cliente, onSuccess }) {
                         <FormLabel className="flex items-center gap-2">
                           Nombres *
                           {documentData && documentData.nombres && (
-                            <Badge variant="secondary" className="text-xs">
+                            <Badge
+                              variant="secondary"
+                              className="text-xs font-normal"
+                            >
                               <CheckCircle className="h-3 w-3 mr-1" />
                               Verificado
                             </Badge>
@@ -907,7 +1069,7 @@ export default function ClienteForm({ cliente, onSuccess }) {
                             {...field}
                             className={
                               documentData && documentData.nombres
-                                ? "border-green-500 bg-green-50"
+                                ? "border-green-500 dark:border-green-500 bg-green-50/50 dark:bg-green-950/20"
                                 : ""
                             }
                           />
@@ -924,7 +1086,10 @@ export default function ClienteForm({ cliente, onSuccess }) {
                         <FormLabel className="flex items-center gap-2">
                           Apellidos *
                           {documentData && documentData.apellidos && (
-                            <Badge variant="secondary" className="text-xs">
+                            <Badge
+                              variant="secondary"
+                              className="text-xs font-normal"
+                            >
                               <CheckCircle className="h-3 w-3 mr-1" />
                               Verificado
                             </Badge>
@@ -936,7 +1101,7 @@ export default function ClienteForm({ cliente, onSuccess }) {
                             {...field}
                             className={
                               documentData && documentData.apellidos
-                                ? "border-green-500 bg-green-50"
+                                ? "border-green-500 dark:border-green-500 bg-green-50/50 dark:bg-green-950/20"
                                 : ""
                             }
                           />
@@ -949,12 +1114,14 @@ export default function ClienteForm({ cliente, onSuccess }) {
               )}
             </CardContent>
           </Card>
-          {/* Información de contacto - Tarjeta compacta */}
-          <Card className="lg:col-span-5 bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-950/20 dark:to-pink-950/20 border-purple-200 dark:border-purple-800">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-purple-900 dark:text-purple-100">
-                <Phone className="h-5 w-5" />
-                Contacto
+          {/* Información de contacto */}
+          <Card className="lg:col-span-5 border-border/50">
+            <CardHeader className="pb-4">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent/10">
+                  <Phone className="h-4 w-4 text-accent" />
+                </div>
+                Información de Contacto
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -991,11 +1158,13 @@ export default function ClienteForm({ cliente, onSuccess }) {
             </CardContent>
           </Card>
 
-          {/* Información de ubicación - Tarjeta ancha */}
-          <Card className="lg:col-span-12 bg-gradient-to-r from-orange-50 to-amber-50 dark:from-orange-950/20 dark:to-amber-950/20 border-orange-200 dark:border-orange-800">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-orange-900 dark:text-orange-100">
-                <MapPin className="h-5 w-5" />
+          {/* Información de ubicación */}
+          <Card className="lg:col-span-12 border-border/50">
+            <CardHeader className="pb-4">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-100 dark:bg-blue-900/30">
+                  <MapPin className="h-4 w-4 text-blue-600" />
+                </div>
                 Información de Ubicación
               </CardTitle>
             </CardHeader>
@@ -1081,7 +1250,10 @@ export default function ClienteForm({ cliente, onSuccess }) {
                     <FormLabel className="flex items-center gap-2">
                       Dirección
                       {documentData && documentData.direccion && (
-                        <Badge variant="secondary" className="text-xs">
+                        <Badge
+                          variant="secondary"
+                          className="text-xs font-normal"
+                        >
                           <CheckCircle className="h-3 w-3 mr-1" />
                           Desde SUNAT
                         </Badge>
@@ -1090,9 +1262,10 @@ export default function ClienteForm({ cliente, onSuccess }) {
                     <FormControl>
                       <Textarea
                         placeholder="Dirección completa (calle, número, referencia)"
+                        rows={3}
                         className={`resize-none ${
                           documentData && documentData.direccion
-                            ? "border-green-500 bg-green-50"
+                            ? "border-green-500 dark:border-green-500 bg-green-50/50 dark:bg-green-950/20"
                             : ""
                         }`}
                         {...field}
@@ -1121,20 +1294,21 @@ export default function ClienteForm({ cliente, onSuccess }) {
           </Card>
         </div>
 
-        <div className="flex justify-between items-center pt-6 border-t">
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+        <div className="flex flex-col sm:flex-row justify-between items-center gap-3 pt-4 border-t">
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
             {hasUnsavedChanges && !isEditing && (
               <>
-                <RefreshCw className="h-4 w-4" />
-                Borrador guardado automáticamente
+                <RefreshCw className="h-3.5 w-3.5" />
+                <span>Borrador guardado automáticamente</span>
               </>
             )}
           </div>
-          <div className="flex gap-3">
+          <div className="flex gap-2 w-full sm:w-auto">
             {!isEditing && hasUnsavedChanges && (
               <Button
                 type="button"
                 variant="outline"
+                size="sm"
                 onClick={() => {
                   localStorage.removeItem("cliente-form-draft");
                   form.reset();
@@ -1144,13 +1318,13 @@ export default function ClienteForm({ cliente, onSuccess }) {
                   toast.info("Formulario reiniciado");
                 }}
               >
-                Limpiar Borrador
+                Limpiar
               </Button>
             )}
             <Button
               type="submit"
               disabled={loading}
-              className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white px-8 py-2 shadow-lg"
+              className="flex-1 sm:flex-initial"
             >
               {loading ? (
                 <>

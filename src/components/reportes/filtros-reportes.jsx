@@ -14,6 +14,8 @@ import {
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Search } from "lucide-react";
+import { ESTADOS_ENVIO_VALIDOS } from "@/lib/constants/estados";
+import { estadosEnvioObject } from "@/lib/constants/estados";
 
 export default function FiltrosReportes({
   searchQuery,
@@ -57,27 +59,14 @@ export default function FiltrosReportes({
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="todos">Todos</SelectItem>
-                <SelectItem value="REGISTRADO">
-                  {formatEstadoLabel("REGISTRADO")}
-                </SelectItem>
-                <SelectItem value="EN_BODEGA">
-                  {formatEstadoLabel("EN_BODEGA")}
-                </SelectItem>
-                <SelectItem value="EN_TRANSITO">
-                  {formatEstadoLabel("EN_TRANSITO")}
-                </SelectItem>
-                <SelectItem value="EN_REPARTO">
-                  {formatEstadoLabel("EN_REPARTO")}
-                </SelectItem>
-                <SelectItem value="ENTREGADO">
-                  {formatEstadoLabel("ENTREGADO")}
-                </SelectItem>
-                <SelectItem value="DEVUELTO">
-                  {formatEstadoLabel("DEVUELTO")}
-                </SelectItem>
-                <SelectItem value="ANULADO">
-                  {formatEstadoLabel("ANULADO")}
-                </SelectItem>
+                {ESTADOS_ENVIO_VALIDOS.map((estadoKey) => {
+                  const estado = estadosEnvioObject[estadoKey];
+                  return estado ? (
+                    <SelectItem key={estadoKey} value={estadoKey}>
+                      {formatEstadoLabel ? formatEstadoLabel(estadoKey) : estado.label}
+                    </SelectItem>
+                  ) : null;
+                })}
               </SelectContent>
             </Select>
           </div>

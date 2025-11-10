@@ -50,7 +50,7 @@ function prepararValorParaBD(valor, tipo) {
 }
 /** * Obtener configuración general de la empresa */ export async function obtenerConfiguracionGeneral() {
   try {
-    await checkPermissions(["SUPER_ADMIN", "ADMIN_SUCURSAL"]); // Obtener configuración clave-valo r
+    await checkPermissions(["SUPER_ADMIN"]); // Solo SUPER_ADMIN puede obtener configuración general
     const configuracionKV = await prisma.configuracion.findMany({
       where: {
         clave: {
@@ -182,7 +182,7 @@ function prepararValorParaBD(valor, tipo) {
   configuracion
 ) {
   try {
-    await checkPermissions(["SUPER_ADMIN", "ADMIN_SUCURSAL"]); // Validaciones básica s
+    await checkPermissions(["SUPER_ADMIN"]); // Solo SUPER_ADMIN puede modificar configuración general
     if (!configuracion.nombreEmpresa?.trim()) {
       throw new Error("El nombre de la empresa es requerido");
     }

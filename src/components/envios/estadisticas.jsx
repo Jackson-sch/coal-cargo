@@ -39,7 +39,8 @@ export default function EstadisticasEnvios({ estadisticas }) {
         </CardHeader>
         <CardContent>
           <div className="text-2xl font-bold">
-            {estadisticas.enviosPorEstado.EN_TRANSITO || 0}
+            {estadisticas.enviosEnTransito ?? 
+              (estadisticas.enviosPorEstado?.EN_TRANSITO || 0)}
           </div>
           <p className="text-xs text-muted-foreground">Envíos en camino</p>
         </CardContent>

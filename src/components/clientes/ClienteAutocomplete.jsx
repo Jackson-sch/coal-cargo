@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Popover,
@@ -33,6 +33,23 @@ function getClienteDisplayName(cliente) {
   return `${nombre} ${apellidos}`.trim();
 }
 
+// Hook para debounce
+function useDebounce(value, delay) {
+  const [debouncedValue, setDebouncedValue] = useState(value);
+
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedValue(value);
+    }, delay);
+
+    return () => {
+      clearTimeout(handler);
+    };
+  }, [value, delay]);
+
+  return debouncedValue;
+}
+
 export default function ClienteAutocomplete({
   onSelect,
   value = null,
@@ -46,12 +63,22 @@ export default function ClienteAutocomplete({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
+  // Debounce de la búsqueda
+  const debouncedQuery = useDebounce(query, 300);
+
+  // Buscar clientes cuando cambia el query o se abre el popover
   useEffect(() => {
     let mounted = true;
+
     const fetchData = async () => {
       try {
         setLoading(true);
-        const result = await getClientesSimple();
+        setError(null);
+
+        // Si no hay query, mostrar algunos clientes recientes (opcional)
+        // Si hay query, buscar con filtro
+        const result = await getClientesSimple(debouncedQuery || "", 50);
+
         if (mounted) {
           if (result?.success) {
             setClientes(result.data || []);
@@ -60,33 +87,44 @@ export default function ClienteAutocomplete({
           }
         }
       } catch (err) {
-        if (mounted) setError(err?.message || "Error al cargar clientes");
+        if (mounted) {
+          setError(err?.message || "Error al cargar clientes");
+        }
       } finally {
         if (mounted) setLoading(false);
       }
     };
 
-    fetchData();
+    // Solo buscar cuando el popover está abierto
+    if (open) {
+      fetchData();
+    }
+
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [debouncedQuery, open]);
 
-  const filtered = useMemo(() => {
-    if (!query) return clientes;
-    const q = query.toLowerCase();
-    return clientes.filter((c) => {
-      const nombre = `${c.nombre || ""} ${c.apellidos || ""}`.toLowerCase();
-      const razon = `${c.razonSocial || ""}`.toLowerCase();
-      const doc = `${c.numeroDocumento || ""}`.toLowerCase();
-      return nombre.includes(q) || razon.includes(q) || doc.includes(q);
-    });
-  }, [clientes, query]);
+  // Cargar cliente seleccionado cuando se proporciona un value
+  useEffect(() => {
+    if (value && !clientes.find((c) => c.id === value.id)) {
+      // Si el cliente seleccionado no está en la lista, agregarlo
+      setClientes((prev) => [value, ...prev]);
+    }
+  }, [value, clientes]);
 
   const selectedLabel = value ? getClienteDisplayName(value) : null;
 
+  // Limpiar query cuando se cierra el popover
+  const handleOpenChange = useCallback((newOpen) => {
+    setOpen(newOpen);
+    if (!newOpen) {
+      setQuery("");
+    }
+  }, []);
+
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover open={open} onOpenChange={handleOpenChange}>
       <PopoverTrigger asChild>
         <Button
           variant="outline"
@@ -95,12 +133,12 @@ export default function ClienteAutocomplete({
           className={className}
           disabled={disabled}
         >
-          {selectedLabel || "Seleccionar cliente"}
+          {selectedLabel || placeholder}
           <ChevronsUpDown className="ml-auto h-4 w-4 opacity-50" />
         </Button>
       </PopoverTrigger>
       <PopoverContent className="p-0 w-[340px]" align="start">
-        <Command>
+        <Command shouldFilter={false}>
           <div className="px-2 py-2 flex items-center gap-2 text-sm text-muted-foreground">
             <Search className="h-4 w-4" />
             Buscar por nombre, razón social o documento
@@ -114,30 +152,33 @@ export default function ClienteAutocomplete({
             {loading && (
               <div className="px-3 py-2 text-sm text-muted-foreground flex items-center gap-2">
                 <Loader2 className="h-4 w-4 animate-spin" />
-                Cargando...
+                Buscando clientes...
               </div>
             )}
-            {!loading && filtered.length === 0 && (
+            {!loading && clientes.length === 0 && !error && (
               <div className="px-3 py-2 text-sm text-muted-foreground">
-                No hay resultados
+                {query
+                  ? "No se encontraron clientes"
+                  : "Escribe para buscar clientes"}
               </div>
             )}
             {!loading &&
-              filtered.map((cliente) => (
+              clientes.map((cliente) => (
                 <CommandItem
                   key={cliente.id}
+                  value={`${cliente.id}-${getClienteDisplayName(cliente)}`}
                   onSelect={() => {
                     setOpen(false);
                     onSelect?.(cliente);
                   }}
                 >
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-1">
                     {cliente.esEmpresa ? (
-                      <Building2 className="h-4 w-4" />
+                      <Building2 className="h-4 w-4 text-muted-foreground" />
                     ) : (
-                      <User className="h-4 w-4" />
+                      <User className="h-4 w-4 text-muted-foreground" />
                     )}
-                    <div className="flex flex-col">
+                    <div className="flex flex-col flex-1">
                       <span className="font-medium">
                         {getClienteDisplayName(cliente)}
                       </span>
@@ -147,7 +188,7 @@ export default function ClienteAutocomplete({
                     </div>
                   </div>
                   {value?.id === cliente.id && (
-                    <Check className="ml-auto h-4 w-4" />
+                    <Check className="ml-2 h-4 w-4" />
                   )}
                 </CommandItem>
               ))}

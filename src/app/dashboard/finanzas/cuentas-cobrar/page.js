@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { getCuentasPorCobrar, registrarPago } from "@/lib/actions/pagos";
 import { getSucursales } from "@/lib/actions/sucursales";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -39,6 +39,17 @@ import { Download, Printer, Filter, CreditCard, Search, X } from "lucide-react";
 import { useDebounce } from "@/hooks/useDebounce";
 import { useEmpresaConfig } from "@/hooks/use-empresa-config";
 import { toast } from "sonner";
+import {
+  useSucursalOrigen,
+  useSucursalDestino,
+  useBusqueda,
+  useMetodoPago,
+  useFechaDesde,
+  useFechaHasta,
+  usePage,
+  useTipoFecha,
+} from "@/hooks/useQueryParams";
+import { useQueryState, parseAsString } from "nuqs";
 
 export default function CuentasPorCobrarPage() {
   const { empresaConfig } = useEmpresaConfig();
@@ -51,22 +62,111 @@ export default function CuentasPorCobrarPage() {
     enviosConSaldo: 0,
     totalEnvios: 0,
   });
+  // Query params con nuqs (sincronizados con URL)
+  const [page, setPage] = usePage(1);
+  const [sucursalOrigenId, setSucursalOrigenId] = useSucursalOrigen(null);
+  const [sucursalDestinoId, setSucursalDestinoId] = useSucursalDestino(null);
+  const [busquedaCliente, setBusquedaCliente] = useBusqueda("");
+  const [estadoEnvio, setEstadoEnvio] = useQueryState(
+    "estadoEnvio",
+    parseAsString.withDefault("")
+  );
+  const [metodoPago, setMetodoPago] = useMetodoPago("");
+  const [fechaDesde, setFechaDesde] = useFechaDesde(null);
+  const [fechaHasta, setFechaHasta] = useFechaHasta(null);
+  const [tipoFecha, setTipoFecha] = useTipoFecha("envio");
+
+  // Paginación (solo limit, total, totalPages son estado local)
   const [pagination, setPagination] = useState({
-    page: 1,
     limit: 50,
     total: 0,
     totalPages: 1,
   });
-  const [rangoFechas, setRangoFechas] = useState(undefined);
-  const [tipoFecha, setTipoFecha] = useState("envio"); // envio | pago
 
-  const [filtros, setFiltros] = useState({
-    sucursalOrigenId: "",
-    sucursalDestinoId: "",
-    busquedaCliente: "",
-    estadoEnvio: "",
-    metodoPago: "",
-  });
+  // Construir objeto rangoFechas desde los hooks (para mantener compatibilidad)
+  const rangoFechas = useMemo(() => {
+    if (!fechaDesde && !fechaHasta) return undefined;
+    return {
+      from: fechaDesde ? new Date(fechaDesde) : null,
+      to: fechaHasta
+        ? new Date(fechaHasta)
+        : fechaDesde
+        ? new Date(fechaDesde)
+        : null,
+    };
+  }, [fechaDesde, fechaHasta]);
+
+  // Función para actualizar rangoFechas (mantiene compatibilidad)
+  const setRangoFechas = (rango) => {
+    if (!rango) {
+      setFechaDesde(null);
+      setFechaHasta(null);
+      return;
+    }
+    setFechaDesde(rango.from ? rango.from.toISOString().split("T")[0] : null);
+    setFechaHasta(rango.to ? rango.to.toISOString().split("T")[0] : null);
+  };
+
+  // Construir objeto filtros desde los hooks (para mantener compatibilidad)
+  const filtros = useMemo(
+    () => ({
+      sucursalOrigenId: sucursalOrigenId || "",
+      sucursalDestinoId: sucursalDestinoId || "",
+      busquedaCliente: busquedaCliente || "",
+      estadoEnvio: estadoEnvio || "",
+      metodoPago: metodoPago || "",
+    }),
+    [
+      sucursalOrigenId,
+      sucursalDestinoId,
+      busquedaCliente,
+      estadoEnvio,
+      metodoPago,
+    ]
+  );
+
+  // Función para actualizar filtros (mantiene compatibilidad)
+  const setFiltros = (newFiltrosOrUpdater) => {
+    const newFiltros =
+      typeof newFiltrosOrUpdater === "function"
+        ? newFiltrosOrUpdater(filtros)
+        : newFiltrosOrUpdater;
+
+    if (newFiltros.sucursalOrigenId !== undefined) {
+      setSucursalOrigenId(
+        newFiltros.sucursalOrigenId === "" ||
+          newFiltros.sucursalOrigenId === "all"
+          ? null
+          : newFiltros.sucursalOrigenId
+      );
+    }
+    if (newFiltros.sucursalDestinoId !== undefined) {
+      setSucursalDestinoId(
+        newFiltros.sucursalDestinoId === "" ||
+          newFiltros.sucursalDestinoId === "all"
+          ? null
+          : newFiltros.sucursalDestinoId
+      );
+    }
+    if (newFiltros.busquedaCliente !== undefined) {
+      setBusquedaCliente(newFiltros.busquedaCliente || null);
+    }
+    if (newFiltros.estadoEnvio !== undefined) {
+      setEstadoEnvio(
+        newFiltros.estadoEnvio === "" || newFiltros.estadoEnvio === "all"
+          ? null
+          : newFiltros.estadoEnvio
+      );
+    }
+    if (newFiltros.metodoPago !== undefined) {
+      setMetodoPago(
+        newFiltros.metodoPago === "" || newFiltros.metodoPago === "all"
+          ? null
+          : newFiltros.metodoPago
+      );
+    }
+  };
+
   const [sucursales, setSucursales] = useState([]);
 
   useEffect(() => {
@@ -83,7 +183,7 @@ export default function CuentasPorCobrarPage() {
     ).padStart(2, "0")}`;
   const todayISO = () => fmtISO(new Date());
 
-  const busquedaDebounced = useDebounce(filtros.busquedaCliente, 400);
+  const busquedaDebounced = useDebounce(busquedaCliente, 400);
 
   const metodosPago = [
     { value: "EFECTIVO", label: "Efectivo" },
@@ -106,7 +206,7 @@ export default function CuentasPorCobrarPage() {
     fecha: todayISO(),
   });
 
-  const cargar = async (page = 1) => {
+  const cargar = async (pageNum = page) => {
     setLoading(true);
     setError(null);
     try {
@@ -134,14 +234,16 @@ export default function CuentasPorCobrarPage() {
         metodoPago: normalize(filtros.metodoPago),
         fechaPagoDesde,
         fechaPagoHasta,
-        page,
+        page: pageNum,
         limit: pagination.limit,
       });
 
       if (res.success) {
         setItems(res.data.items);
         setResumen(res.data.resumen);
-        setPagination(res.data.pagination);
+        // Actualizar paginación pero mantener page del hook de nuqs
+        const { page: _, ...paginationData } = res.data.pagination;
+        setPagination(paginationData);
       } else {
         setError(res.error || "Error al cargar datos");
       }
@@ -156,17 +258,34 @@ export default function CuentasPorCobrarPage() {
     cargar(1);
   }, []);
 
-  // Actualización en tiempo real: cambiar filtros dispara carga
+  // Resetear página cuando cambian los filtros (excepto page)
   useEffect(() => {
-    setPagination((p) => ({ ...p, page: 1 }));
-    cargar(1);
+    if (page !== 1) {
+      setPage(1);
+    }
   }, [
-    filtros.sucursalOrigenId,
-    filtros.sucursalDestinoId,
-    filtros.estadoEnvio,
-    filtros.metodoPago,
+    sucursalOrigenId,
+    sucursalDestinoId,
+    estadoEnvio,
+    metodoPago,
     busquedaDebounced,
-    rangoFechas,
+    fechaDesde,
+    fechaHasta,
+    tipoFecha,
+  ]);
+
+  // Cargar cuando cambia la página o los filtros
+  useEffect(() => {
+    cargar(page);
+  }, [
+    page,
+    sucursalOrigenId,
+    sucursalDestinoId,
+    estadoEnvio,
+    metodoPago,
+    busquedaDebounced,
+    fechaDesde,
+    fechaHasta,
     tipoFecha,
   ]);
 
@@ -212,14 +331,13 @@ export default function CuentasPorCobrarPage() {
   const limpiar = () => {
     setRangoFechas(undefined);
     setTipoFecha("envio");
-    setFiltros({
-      sucursalOrigenId: "",
-      sucursalDestinoId: "",
-      busquedaCliente: "",
-      estadoEnvio: "",
-      metodoPago: "",
-    });
-    cargar(1);
+    setSucursalOrigenId(null);
+    setSucursalDestinoId(null);
+    setBusquedaCliente(null);
+    setEstadoEnvio(null);
+    setMetodoPago(null);
+    setPage(1);
+    // cargar se ejecutará automáticamente cuando cambien los filtros
   };
 
   const displayCliente = (c) =>
@@ -245,7 +363,7 @@ export default function CuentasPorCobrarPage() {
       if (res.success) {
         toast.success("Pago registrado correctamente");
         setPagoModal({ ...pagoModal, open: false });
-        cargar(pagination.page);
+        cargar(page);
       } else {
         toast.error(res.error || "Error al registrar pago");
       }
@@ -255,7 +373,7 @@ export default function CuentasPorCobrarPage() {
   };
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="space-y-6">
       {/* Estilos de impresión específicos para CxC: solo tabla y en horizontal */}
       <style>{`
         @media print {
@@ -472,10 +590,11 @@ export default function CuentasPorCobrarPage() {
                 Sucursal Origen
               </label>
               <Select
-                value={filtros.sucursalOrigenId}
-                onValueChange={(v) =>
-                  setFiltros((f) => ({ ...f, sucursalOrigenId: v }))
-                }
+                value={sucursalOrigenId || "all"}
+                onValueChange={(v) => {
+                  setSucursalOrigenId(v === "all" ? null : v);
+                  setPage(1);
+                }}
               >
                 <SelectTrigger className="mt-1">
                   <SelectValue placeholder="Todas" />
@@ -495,10 +614,11 @@ export default function CuentasPorCobrarPage() {
                 Sucursal Destino
               </label>
               <Select
-                value={filtros.sucursalDestinoId}
-                onValueChange={(v) =>
-                  setFiltros((f) => ({ ...f, sucursalDestinoId: v }))
-                }
+                value={sucursalDestinoId || "all"}
+                onValueChange={(v) => {
+                  setSucursalDestinoId(v === "all" ? null : v);
+                  setPage(1);
+                }}
               >
                 <SelectTrigger className="mt-1">
                   <SelectValue placeholder="Todas" />
@@ -521,25 +641,24 @@ export default function CuentasPorCobrarPage() {
                 <InputGroup>
                   <InputGroupInput
                     placeholder="Nombre, razón social o documento"
-                    value={filtros.busquedaCliente}
-                    onChange={(e) =>
-                      setFiltros((f) => ({
-                        ...f,
-                        busquedaCliente: e.target.value,
-                      }))
-                    }
+                    value={busquedaCliente || ""}
+                    onChange={(e) => {
+                      setBusquedaCliente(e.target.value || null);
+                      setPage(1);
+                    }}
                   />
                   <InputGroupAddon>
                     <Search className="h-4 w-4 text-muted-foreground" />
                   </InputGroupAddon>
                   <InputGroupAddon align="inline-end">
-                    {filtros.busquedaCliente && (
+                    {busquedaCliente && (
                       <InputGroupButton
                         size="icon-xs"
                         variant="ghost"
-                        onClick={() =>
-                          setFiltros((f) => ({ ...f, busquedaCliente: "" }))
-                        }
+                        onClick={() => {
+                          setBusquedaCliente(null);
+                          setPage(1);
+                        }}
                         title="Limpiar"
                       >
                         <X className="h-4 w-4" />
@@ -554,10 +673,11 @@ export default function CuentasPorCobrarPage() {
                 Método de Pago
               </label>
               <Select
-                value={filtros.metodoPago}
-                onValueChange={(v) =>
-                  setFiltros((f) => ({ ...f, metodoPago: v }))
-                }
+                value={metodoPago || "all"}
+                onValueChange={(v) => {
+                  setMetodoPago(v === "all" ? null : v);
+                  setPage(1);
+                }}
               >
                 <SelectTrigger className="mt-1">
                   <SelectValue placeholder="Todos" />
@@ -575,22 +695,26 @@ export default function CuentasPorCobrarPage() {
             <div>
               <label className="text-sm text-muted-foreground">Estado</label>
               <Select
-                value={filtros.estadoEnvio}
-                onValueChange={(v) =>
-                  setFiltros((f) => ({ ...f, estadoEnvio: v }))
-                }
+                value={estadoEnvio || "all"}
+                onValueChange={(v) => {
+                  setEstadoEnvio(v === "all" ? null : v);
+                  setPage(1);
+                }}
               >
                 <SelectTrigger className="mt-1">
                   <SelectValue placeholder="Todos" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Todos</SelectItem>
-                  <SelectItem value="pendiente">Pendiente</SelectItem>
-                  <SelectItem value="registrado">Registrado</SelectItem>
-                  <SelectItem value="en_bodega">En Bodega</SelectItem>
-                  <SelectItem value="en_reparto">En Reparto</SelectItem>
-                  <SelectItem value="entregado">Entregado</SelectItem>
-                  <SelectItem value="cancelado">Cancelado</SelectItem>
+                  <SelectItem value="REGISTRADO">Registrado</SelectItem>
+                  <SelectItem value="EN_BODEGA">En Bodega</SelectItem>
+                  <SelectItem value="EN_AGENCIA_ORIGEN">En Agencia Origen</SelectItem>
+                  <SelectItem value="EN_TRANSITO">En Tránsito</SelectItem>
+                  <SelectItem value="EN_AGENCIA_DESTINO">En Agencia Destino</SelectItem>
+                  <SelectItem value="EN_REPARTO">En Reparto</SelectItem>
+                  <SelectItem value="ENTREGADO">Entregado</SelectItem>
+                  <SelectItem value="DEVUELTO">Devuelto</SelectItem>
+                  <SelectItem value="ANULADO">Anulado</SelectItem>
                 </SelectContent>
               </Select>
             </div>

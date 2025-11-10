@@ -9,6 +9,7 @@ import path from "path";
 import crypto from "crypto";
 import { z } from "zod";
 import { auth } from "@/lib/auth";
+import { handleServerActionError, logError } from "@/lib/utils/error-handler";
 
 const execAsync = promisify(exec);
 
@@ -250,8 +251,14 @@ export async function crearRespaldo(data) {
       },
     });
 
-    // Ejecutar respaldo en background
-    ejecutarRespaldoBackground(respaldo.id);
+    // Ejecutar respaldo en background (sin await para no bloquear)
+    // Los errores se manejarán dentro de la función
+    ejecutarRespaldoBackground(respaldo.id).catch((error) => {
+      // Los errores ya se manejan dentro de ejecutarRespaldoBackground
+      // pero podemos loggear aquí también si es necesario
+      console.error("Error al ejecutar respaldo en background:", error);
+      logError(error, { context: "crearRespaldo", respaldoId: respaldo.id });
+    });
 
     revalidatePath("/dashboard/respaldo");
 
@@ -500,6 +507,10 @@ async function ejecutarRespaldoBackground(respaldoId) {
       throw new Error("Respaldos no disponibles durante el build");
     }
 
+    // Obtener configuración para timeout
+    const configuracion = await obtenerConfiguracionRespaldos();
+    const timeout = configuracion.data?.timeoutRespaldo || 3600; // 1 hora por defecto
+
     // Actualizar estado a EN_PROGRESO
     await prisma.respaldos.update({
       where: { id: respaldoId },
@@ -513,15 +524,21 @@ async function ejecutarRespaldoBackground(respaldoId) {
       where: { id: respaldoId },
     });
 
+    if (!respaldo) {
+      throw new Error("Respaldo no encontrado");
+    }
+
     // Generar nombre de archivo
     const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
-    const nombreArchivo = `backup_${timestamp}.sql`;
+    const nombreArchivo = configuracion.data?.comprimirRespaldos
+      ? `backup_${timestamp}.sql.gz`
+      : `backup_${timestamp}.sql`;
 
-    // Usar ruta relativa específica para evitar escaneo del sistema
-    const backupsDir = "./backups";
+    // Obtener ruta de respaldos de la configuración
+    const backupsDir = configuracion.data?.rutaLocal || "./backups";
     const rutaArchivo = path.join(backupsDir, nombreArchivo);
 
-    // Asegurar que existe el directorio (solo crear la carpeta backups)
+    // Asegurar que existe el directorio
     await fs.mkdir(backupsDir, { recursive: true });
 
     // Actualizar progreso
@@ -530,10 +547,184 @@ async function ejecutarRespaldoBackground(respaldoId) {
       data: { progreso: 30 },
     });
 
-    // Ejecutar pg_dump solo si no estamos en build
+    // Ejecutar pg_dump con timeout
     const databaseUrl = process.env.DATABASE_URL;
-    const comando = `pg_dump "${databaseUrl}" > "${rutaArchivo}"`;
-    await execAsync(comando);
+    if (!databaseUrl) {
+      throw new Error("DATABASE_URL no configurada");
+    }
+
+    // Construir comando de respaldo
+    // Extraer componentes de la URL de conexión para mayor compatibilidad
+    const isWindows = process.platform === "win32";
+    
+    // Parsear DATABASE_URL para obtener componentes individuales
+    let urlObj;
+    try {
+      urlObj = new URL(databaseUrl);
+    } catch (error) {
+      throw new Error(`DATABASE_URL tiene un formato inválido: ${error.message}`);
+    }
+
+    const dbHost = urlObj.hostname;
+    const dbPort = urlObj.port || "5432";
+    const dbName = urlObj.pathname.substring(1); // Remover el "/" inicial
+    const dbUser = urlObj.username;
+    const dbPassword = urlObj.password;
+
+    // En Windows, intentar encontrar pg_dump en ubicaciones comunes
+    let pgDumpPath = "pg_dump";
+    let pgDumpEncontrado = false;
+    
+    if (isWindows) {
+      const posiblesRutas = [
+        "C:\\Program Files\\PostgreSQL\\17\\bin\\pg_dump.exe",
+        "C:\\Program Files\\PostgreSQL\\16\\bin\\pg_dump.exe",
+        "C:\\Program Files\\PostgreSQL\\15\\bin\\pg_dump.exe",
+        "C:\\Program Files\\PostgreSQL\\14\\bin\\pg_dump.exe",
+        "C:\\Program Files\\PostgreSQL\\13\\bin\\pg_dump.exe",
+        "C:\\Program Files (x86)\\PostgreSQL\\17\\bin\\pg_dump.exe",
+        "C:\\Program Files (x86)\\PostgreSQL\\16\\bin\\pg_dump.exe",
+        "C:\\Program Files (x86)\\PostgreSQL\\15\\bin\\pg_dump.exe",
+      ];
+
+      // Intentar encontrar pg_dump
+      for (const ruta of posiblesRutas) {
+        try {
+          await fs.access(ruta);
+          pgDumpPath = `"${ruta}"`; // Usar ruta completa con comillas
+          pgDumpEncontrado = true;
+          break;
+        } catch {
+          // Continuar buscando
+        }
+      }
+      
+      // Si no se encontró en rutas comunes, verificar si está en PATH
+      if (!pgDumpEncontrado) {
+        try {
+          // Intentar ejecutar pg_dump para ver si está en PATH
+          await execAsync("pg_dump --version", { timeout: 2000, shell: true });
+          pgDumpPath = "pg_dump"; // Está en PATH
+          pgDumpEncontrado = true;
+        } catch {
+          // No está disponible
+        }
+      }
+    }
+
+    // Si no se encontró pg_dump, lanzar error antes de intentar ejecutar
+    if (isWindows && !pgDumpEncontrado) {
+      throw new Error(
+        "pg_dump no está instalado o no está en el PATH. " +
+        "Instala PostgreSQL desde https://www.postgresql.org/download/ " +
+        "y asegúrate de que pg_dump esté en el PATH del sistema o reinicia tu servidor de desarrollo."
+      );
+    }
+
+    // Construir comando de respaldo usando parámetros individuales (más compatible)
+    const pgDumpArgs = [
+      `--host=${dbHost}`,
+      `--port=${dbPort}`,
+      `--username=${dbUser}`,
+      `--dbname=${dbName}`,
+      "--no-password", // Usar PGPASSWORD en lugar de prompt
+      "--format=plain",
+      "--no-owner",
+      "--no-acl",
+    ];
+
+    // Construir el comando completo de pg_dump
+    // Si pgDumpPath tiene comillas (ruta completa), removerlas para construir el comando correctamente
+    const pgDumpExe = pgDumpPath.replace(/^"|"$/g, ''); // Remover comillas si las tiene
+    const pgDumpCmd = `${pgDumpExe} ${pgDumpArgs.join(" ")}`;
+
+    let comando;
+    if (configuracion.data?.comprimirRespaldos) {
+      // Comprimir con gzip
+      // Nota: gzip puede no estar disponible en Windows por defecto
+      // El usuario deberá instalar gzip o desactivar compresión
+      if (isWindows) {
+        // En Windows, usar cmd.exe para mejor compatibilidad
+        // Usar comillas alrededor de la ruta completa si tiene espacios
+        const pgDumpExeQuoted = pgDumpExe.includes(' ') ? `"${pgDumpExe}"` : pgDumpExe;
+        comando = `cmd /c "${pgDumpExeQuoted} ${pgDumpArgs.join(" ")} | gzip -${configuracion.data.nivelCompresion || 6} > "${rutaArchivo}""`;
+      } else {
+        comando = `${pgDumpCmd} | gzip -${configuracion.data.nivelCompresion || 6} > "${rutaArchivo}"`;
+      }
+    } else {
+      // Sin compresión
+      if (isWindows) {
+        // En Windows, usar cmd.exe para redirección
+        // Usar comillas alrededor de la ruta completa si tiene espacios
+        const pgDumpExeQuoted = pgDumpExe.includes(' ') ? `"${pgDumpExe}"` : pgDumpExe;
+        comando = `cmd /c "${pgDumpExeQuoted} ${pgDumpArgs.join(" ")} > "${rutaArchivo}""`;
+      } else {
+        comando = `${pgDumpCmd} > "${rutaArchivo}"`;
+      }
+    }
+
+    // Ejecutar con timeout
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error(`Timeout después de ${timeout} segundos`)), timeout * 1000);
+    });
+
+    try {
+      // Preparar variables de entorno
+      // En Windows, agregar rutas comunes de PostgreSQL al PATH si no están
+      let env = { ...process.env };
+      env.PGPASSWORD = dbPassword; // Establecer PGPASSWORD en el entorno
+      
+      if (isWindows) {
+        const posiblesRutas = [
+          "C:\\Program Files\\PostgreSQL\\17\\bin",
+          "C:\\Program Files\\PostgreSQL\\16\\bin",
+          "C:\\Program Files\\PostgreSQL\\15\\bin",
+          "C:\\Program Files\\PostgreSQL\\14\\bin",
+        ];
+
+        // Agregar rutas que existan al PATH
+        for (const rutaBin of posiblesRutas) {
+          try {
+            await fs.access(rutaBin);
+            const currentPath = env.Path || env.PATH || "";
+            if (!currentPath.includes(rutaBin)) {
+              env.Path = currentPath + ";" + rutaBin;
+            }
+          } catch {
+            // Continuar
+          }
+        }
+      }
+
+      // En Windows, asegurar que PowerShell pueda ejecutar el comando
+      const execOptions = {
+        maxBuffer: 50 * 1024 * 1024, // 50MB buffer para respaldos grandes
+        shell: true,
+        env: env,
+      };
+
+      // El comando ya está construido arriba con formato adecuado para Windows
+
+      await Promise.race([execAsync(comando, execOptions), timeoutPromise]);
+    } catch (error) {
+      // Mejorar mensaje de error
+      if (error.message.includes("timeout")) {
+        throw new Error(`El respaldo excedió el tiempo límite de ${timeout} segundos`);
+      } else if (error.message.includes("pg_dump") || error.code === "ENOENT" || error.message.includes("no se reconoce")) {
+        throw new Error(
+          "pg_dump no está instalado o no está en el PATH. " +
+          "Instala PostgreSQL desde https://www.postgresql.org/download/ " +
+          "y asegúrate de que pg_dump esté en el PATH del sistema."
+        );
+      } else if (error.message.includes("authentication") || error.message.includes("password") || error.message.includes("FATAL")) {
+        throw new Error(
+          "Error de autenticación con la base de datos. " +
+          `Verifica que las credenciales en DATABASE_URL sean correctas. Error: ${error.message}`
+        );
+      } else {
+        throw new Error(`Error al ejecutar respaldo: ${error.message || error.stderr || "Error desconocido"}`);
+      }
+    }
 
     // Actualizar progreso
     await prisma.respaldos.update({
@@ -541,11 +732,17 @@ async function ejecutarRespaldoBackground(respaldoId) {
       data: { progreso: 70 },
     });
 
-    // Obtener información del archivo
-    const stats = await fs.stat(rutaArchivo);
+    // Verificar que el archivo se creó
+    let stats;
+    try {
+      stats = await fs.stat(rutaArchivo);
+    } catch (error) {
+      throw new Error(`No se pudo crear el archivo de respaldo: ${error.message}`);
+    }
+
     const tamano = stats.size;
 
-    // Generar checksum
+    // Generar checksum para verificación de integridad
     const contenido = await fs.readFile(rutaArchivo);
     const checksum = crypto
       .createHash("sha256")
@@ -578,9 +775,18 @@ async function ejecutarRespaldoBackground(respaldoId) {
       },
     });
 
+    // Notificar éxito si está configurado
+    if (configuracion.data?.notificarExito) {
+      await enviarNotificacionRespaldo(respaldoId, "exito").catch((error) => {
+        logError(error, { context: "enviarNotificacionRespaldo" });
+      });
+    }
+
     // Actualizar estadísticas
     await actualizarEstadisticasRespaldo();
   } catch (error) {
+    logError(error, { context: "ejecutarRespaldoBackground", respaldoId });
+
     await prisma.respaldos.update({
       where: { id: respaldoId },
       data: {
@@ -590,6 +796,14 @@ async function ejecutarRespaldoBackground(respaldoId) {
         fechaFinalizacion: new Date(),
       },
     });
+
+    // Notificar error si está configurado
+    const configuracion = await obtenerConfiguracionRespaldos();
+    if (configuracion.data?.notificarError) {
+      await enviarNotificacionRespaldo(respaldoId, "error").catch((err) => {
+        logError(err, { context: "enviarNotificacionRespaldo" });
+      });
+    }
   }
 }
 
@@ -600,7 +814,38 @@ async function ejecutarRestauracionBackground(restauracionId) {
       include: { respaldo: true },
     });
 
-    if (!restauracion) return;
+    if (!restauracion) {
+      throw new Error("Restauración no encontrada");
+    }
+
+    // Verificar que el respaldo existe y está completo
+    if (!restauracion.respaldo) {
+      throw new Error("Respaldo asociado no encontrado");
+    }
+
+    if (restauracion.respaldo.estado !== "COMPLETADO") {
+      throw new Error("El respaldo no está completo");
+    }
+
+    // Verificar que el archivo existe
+    try {
+      await fs.access(restauracion.respaldo.rutaArchivo);
+    } catch (error) {
+      throw new Error(`Archivo de respaldo no encontrado: ${restauracion.respaldo.rutaArchivo}`);
+    }
+
+    // Verificar checksum si existe
+    if (restauracion.respaldo.checksum) {
+      const contenido = await fs.readFile(restauracion.respaldo.rutaArchivo);
+      const checksumActual = crypto
+        .createHash("sha256")
+        .update(contenido)
+        .digest("hex");
+
+      if (checksumActual !== restauracion.respaldo.checksum) {
+        throw new Error("Checksum del archivo no coincide. El archivo puede estar corrupto.");
+      }
+    }
 
     // Actualizar estado
     await prisma.restauraciones.update({
@@ -613,12 +858,26 @@ async function ejecutarRestauracionBackground(restauracionId) {
 
     // Crear respaldo previo si está configurado
     if (restauracion.crearRespaldoAntes) {
-      await crearRespaldo({
+      await prisma.restauraciones.update({
+        where: { id: restauracionId },
+        data: { progreso: 20 },
+      });
+
+      const respaldoPrevioResult = await crearRespaldo({
         nombre: `Respaldo previo a restauración - ${new Date().toISOString()}`,
         descripcion: "Respaldo automático antes de restauración",
         tipo: "AUTOMATICO",
-        usuarioId: restauracion.creadoPor,
+        usuarioId: restauracion.creadoPor || "sistema",
       });
+
+      if (respaldoPrevioResult.success) {
+        await prisma.restauraciones.update({
+          where: { id: restauracionId },
+          data: {
+            respaldoPrevioId: respaldoPrevioResult.data.id,
+          },
+        });
+      }
     }
 
     // Actualizar progreso
@@ -629,8 +888,74 @@ async function ejecutarRestauracionBackground(restauracionId) {
 
     // Ejecutar restauración
     const databaseUrl = process.env.DATABASE_URL;
-    const comando = `psql "${databaseUrl}" < "${restauracion.respaldo.rutaArchivo}"`;
-    await execAsync(comando);
+    if (!databaseUrl) {
+      throw new Error("DATABASE_URL no configurada");
+    }
+
+    // Parsear DATABASE_URL para restaurar también
+    let urlObjRestore;
+    try {
+      urlObjRestore = new URL(databaseUrl);
+    } catch (error) {
+      throw new Error(`DATABASE_URL tiene un formato inválido: ${error.message}`);
+    }
+
+    const dbHostRestore = urlObjRestore.hostname;
+    const dbPortRestore = urlObjRestore.port || "5432";
+    const dbNameRestore = urlObjRestore.pathname.substring(1);
+    const dbUserRestore = urlObjRestore.username;
+    const dbPasswordRestore = urlObjRestore.password;
+
+    const isWindowsRestore = process.platform === "win32";
+    
+    const psqlArgs = [
+      `--host=${dbHostRestore}`,
+      `--port=${dbPortRestore}`,
+      `--username=${dbUserRestore}`,
+      `--dbname=${dbNameRestore}`,
+      "--no-password",
+    ];
+
+    const archivo = restauracion.respaldo.rutaArchivo;
+
+    // Si el archivo está comprimido (termina en .gz), descomprimir primero
+    let comando;
+    if (archivo.endsWith(".gz")) {
+      const psqlCmd = `psql ${psqlArgs.join(" ")}`;
+      if (isWindowsRestore) {
+        // En Windows, usar cmd para mejor compatibilidad
+        comando = `cmd /c "gunzip -c "${archivo}" | ${psqlCmd}"`;
+      } else {
+        comando = `gunzip -c "${archivo}" | PGPASSWORD="${dbPasswordRestore}" ${psqlCmd}`;
+      }
+    } else {
+      const psqlCmd = `psql ${psqlArgs.join(" ")}`;
+      if (isWindowsRestore) {
+        comando = `cmd /c "${psqlCmd} < "${archivo}"`;
+      } else {
+        comando = `PGPASSWORD="${dbPasswordRestore}" ${psqlCmd} < "${archivo}"`;
+      }
+    }
+
+    await prisma.restauraciones.update({
+      where: { id: restauracionId },
+      data: { progreso: 70 },
+    });
+
+    await execAsync(comando, {
+      maxBuffer: 50 * 1024 * 1024, // 50MB buffer
+      shell: true,
+      env: {
+        ...process.env,
+        PGPASSWORD: dbPasswordRestore,
+      },
+    });
+
+    // Actualizar progreso
+    await prisma.restauraciones.update({
+      where: { id: restauracionId },
+      data: { progreso: 90 },
+    });
 
     // Finalizar restauración
     const fechaFinalizacion = new Date();
@@ -645,10 +970,17 @@ async function ejecutarRestauracionBackground(restauracionId) {
         progreso: 100,
         fechaFinalizacion,
         duracion,
-        registrosRestaurados: 0, // TODO: Calcular registros reales
+        registrosRestaurados: null, // No se puede calcular fácilmente desde psql
       },
     });
+
+    // Notificar éxito
+    await enviarNotificacionRestauracion(restauracionId, "exito").catch((error) => {
+      logError(error, { context: "enviarNotificacionRestauracion" });
+    });
   } catch (error) {
+    logError(error, { context: "ejecutarRestauracionBackground", restauracionId });
+
     await prisma.restauraciones.update({
       where: { id: restauracionId },
       data: {
@@ -657,6 +989,11 @@ async function ejecutarRestauracionBackground(restauracionId) {
         detalleError: error.stack,
         fechaFinalizacion: new Date(),
       },
+    });
+
+    // Notificar error
+    await enviarNotificacionRestauracion(restauracionId, "error").catch((err) => {
+      logError(err, { context: "enviarNotificacionRestauracion" });
     });
   }
 }
@@ -807,4 +1144,113 @@ function formatBytes(bytes) {
   const sizes = ["Bytes", "KB", "MB", "GB", "TB"];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
+}
+
+/**
+ * Enviar notificación de respaldo (éxito o error)
+ */
+async function enviarNotificacionRespaldo(respaldoId, tipo) {
+  try {
+    const respaldo = await prisma.respaldos.findUnique({
+      where: { id: respaldoId },
+      include: {
+        usuario: {
+          select: { email: true, name: true },
+        },
+      },
+    });
+
+    if (!respaldo) return;
+
+    const configuracion = await obtenerConfiguracionRespaldos();
+    const emails = configuracion.data?.emailsNotificacion || [];
+
+    if (emails.length === 0 && respaldo.usuario?.email) {
+      emails.push(respaldo.usuario.email);
+    }
+
+    if (emails.length === 0) return;
+
+    const { enviarEmail } = await import(
+      "@/lib/services/notificaciones/email-service"
+    );
+
+    const asunto =
+      tipo === "exito"
+        ? `✅ Respaldo completado: ${respaldo.nombre}`
+        : `❌ Error en respaldo: ${respaldo.nombre}`;
+
+    const mensaje =
+      tipo === "exito"
+        ? `El respaldo "${respaldo.nombre}" se completó exitosamente.\n\nDetalles:\n- Tamaño: ${formatBytes(Number(respaldo.tamano || 0))}\n- Duración: ${respaldo.duracion}s\n- Fecha: ${respaldo.fechaFinalizacion?.toLocaleString("es-PE")}`
+        : `El respaldo "${respaldo.nombre}" falló.\n\nError: ${respaldo.mensajeError}\n\nFecha: ${respaldo.fechaFinalizacion?.toLocaleString("es-PE")}`;
+
+    // Enviar a todos los emails configurados
+    await Promise.all(
+      emails.map((email) =>
+        enviarEmail({
+          destinatario: email,
+          asunto,
+          mensaje,
+        })
+      )
+    );
+  } catch (error) {
+    logError(error, { context: "enviarNotificacionRespaldo" });
+  }
+}
+
+/**
+ * Enviar notificación de restauración (éxito o error)
+ */
+async function enviarNotificacionRestauracion(restauracionId, tipo) {
+  try {
+    const restauracion = await prisma.restauraciones.findUnique({
+      where: { id: restauracionId },
+      include: {
+        respaldo: true,
+        usuario: {
+          select: { email: true, name: true },
+        },
+      },
+    });
+
+    if (!restauracion) return;
+
+    const configuracion = await obtenerConfiguracionRespaldos();
+    const emails = configuracion.data?.emailsNotificacion || [];
+
+    if (emails.length === 0 && restauracion.usuario?.email) {
+      emails.push(restauracion.usuario.email);
+    }
+
+    if (emails.length === 0) return;
+
+    const { enviarEmail } = await import(
+      "@/lib/services/notificaciones/email-service"
+    );
+
+    const asunto =
+      tipo === "exito"
+        ? `✅ Restauración completada`
+        : `❌ Error en restauración`;
+
+    const mensaje =
+      tipo === "exito"
+        ? `La restauración del respaldo "${restauracion.respaldo?.nombre}" se completó exitosamente.\n\nDetalles:\n- Duración: ${restauracion.duracion}s\n- Fecha: ${restauracion.fechaFinalizacion?.toLocaleString("es-PE")}`
+        : `La restauración del respaldo "${restauracion.respaldo?.nombre}" falló.\n\nError: ${restauracion.mensajeError}\n\nFecha: ${restauracion.fechaFinalizacion?.toLocaleString("es-PE")}`;
+
+    // Enviar a todos los emails configurados
+    await Promise.all(
+      emails.map((email) =>
+        enviarEmail({
+          destinatario: email,
+          asunto,
+          mensaje,
+        })
+      )
+    );
+  } catch (error) {
+    logError(error, { context: "enviarNotificacionRestauracion" });
+  }
 }

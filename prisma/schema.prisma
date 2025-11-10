@@ -269,6 +269,7 @@ model sucursales {
   tarifasDestino      tarifas_sucursales[] @relation("TarifaDestino")
   tarifasOrigen       tarifas_sucursales[] @relation("TarifaOrigen")
   usuarios            usuarios[]
+  vehiculos           vehiculos[]
   rutasOrigen         rutas[]              @relation("RutaOrigen")
   rutasDestino        rutas[]              @relation("RutaDestino")
 
@@ -352,18 +353,33 @@ model usuarios {
 }
 
 model vehiculos {
-  id          String    @id
-  placa       String    @unique
-  modelo      String?
-  capacidad   Float?
-  conductorId String?   @unique
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  deletedAt   DateTime?
-  envios      envios[]
-  usuarios    usuarios? @relation(fields: [conductorId], references: [id])
+  id            String         @id @default(cuid())
+  placa         String         @unique
+  marca         String?
+  modelo        String?
+  año           Int?
+  capacidad     Float?         // Alias para pesoMaximo (compatibilidad)
+  pesoMaximo    Float          // Peso máximo en kg
+  volumenMaximo Float?         // Volumen máximo en m³
+  tipoVehiculo  TipoVehiculo?
+  estado        EstadoVehiculo @default(DISPONIBLE)
+  sucursalId    String?        // Sucursal a la que pertenece el vehículo
+  conductorId   String?        @unique
+  soat          DateTime?      // Fecha de vencimiento del SOAT
+  revision      DateTime?      // Fecha de próxima revisión técnica
+  observaciones String?        // Observaciones adicionales
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  deletedAt     DateTime?
+  // Relaciones
+  envios        envios[]
+  usuarios      usuarios?      @relation(fields: [conductorId], references: [id])
+  sucursal      sucursales?    @relation(fields: [sucursalId], references: [id])
 
   @@index([deletedAt])
+  @@index([estado])
+  @@index([sucursalId])
+  @@index([conductorId])
 }
 
 model verification_tokens {

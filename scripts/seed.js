@@ -1,2 +1,29 @@
-const seedUbigeoPeru = require("./seed-ubigeo-peru"); const { seedTarifasDestinoIniciales, } = require("../src/lib/seeds/tarifas-destino-iniciales"); const { seedConfiguracionInicial, } = require("../src/lib/seeds/configuracion-inicial"); const { prisma } = require("../src/lib/prisma-cjs"); const createTestUser = require("../src/lib/seeds/create-test-user"); async function main() { console.log("🚀 Iniciando proceso de seeding..."); try { await seedUbigeoPeru(); await seedTarifasDestinoIniciales(); await seedConfiguracionInicial(); await createTestUser(); console.log("🎉 Proceso de seeding completado exitosamente"); } catch (error) { console.error("💥 Error durante el seeding:", error); process.exit(1); } finally { await prisma.$disconnect(); }
-} // Ejecutar la función principal usando CommonJS main().catch((e) => { console.error("Error no manejado durante el seeding:", e); process.exit(1); });
+const seedUbigeoPeru = require("./seed-ubigeo-peru");
+const { seedTarifasDestinoIniciales } = require("../src/lib/seeds/tarifas-destino-iniciales");
+const { seedConfiguracionInicial } = require("../src/lib/seeds/configuracion-inicial");
+const { prisma } = require("../src/lib/prisma-cjs");
+const createTestUser = require("../src/lib/seeds/create-test-user");
+const seedClientes = require("./seed-clientes");
+
+async function main() {
+  console.log("🚀 Iniciando proceso de seeding...");
+  try {
+    await seedUbigeoPeru();
+    await seedTarifasDestinoIniciales();
+    await seedConfiguracionInicial();
+    await createTestUser();
+    await seedClientes();
+    console.log("🎉 Proceso de seeding completado exitosamente");
+  } catch (error) {
+    console.error("💥 Error durante el seeding:", error);
+    process.exit(1);
+  } finally {
+    await prisma.$disconnect();
+  }
+}
+
+// Ejecutar la función principal usando CommonJS
+main().catch((e) => {
+  console.error("Error no manejado durante el seeding:", e);
+  process.exit(1);
+});

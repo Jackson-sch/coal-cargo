@@ -77,7 +77,7 @@ export default function EstadisticasRapidasClientes({
   }
 
   return (
-    <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+    <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
       {cards.slice(0, 4).map((card) => (
         <StatCard key={card.title} {...card} />
       ))}

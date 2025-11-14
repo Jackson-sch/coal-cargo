@@ -9,6 +9,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
+import { BorderBeam } from "./border-beam";
 
 const Modal = memo(function Modal({
   children,
@@ -51,7 +52,7 @@ const Modal = memo(function Modal({
   );
 
   return (
-    <Dialog open={open} onOpenChange={handleOpenChange}>
+    <Dialog open={open} onOpenChange={handleOpenChange} className="relative">
       <DialogContent
         className={cn(
           sizeClasses[size],
@@ -123,6 +124,12 @@ const Modal = memo(function Modal({
             </div>
           </div>
         )}
+        <BorderBeam
+          duration={4}
+          size={300}
+          reverse
+          className="from-transparent via-green-500 to-transparent"
+        />
       </DialogContent>
     </Dialog>
   );

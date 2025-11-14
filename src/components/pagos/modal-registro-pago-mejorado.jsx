@@ -35,6 +35,9 @@ import { buscarEnvioPorGuia, buscarEnviosParaPago } from "@/lib/actions/envios";
 import { registrarPago } from "@/lib/actions/pagos";
 import { useDebounce } from "@/hooks/useDebounce";
 import { formatCurrency } from "@/lib/utils/formatters";
+import Modal from "@/components/ui/modal";
+import { DatePicker } from "@/components/ui/date-picker";
+import { format } from "date-fns";
 
 const metodosPago = [
   { value: "EFECTIVO", label: "Efectivo" },
@@ -52,7 +55,7 @@ export default function ModalRegistroPagoMejorado({
   onClose,
   onPagoRegistrado,
 }) {
-  const [paso, setPaso] = useState(1); // 1: Buscar envío, 2: Registrar pago, 3: Voucher
+  const [paso, setPaso] = useState(2); // 1: Buscar envío, 2: Registrar pago, 3: Voucher
   const [buscandoEnvio, setBuscandoEnvio] = useState(false);
   const [guardandoPago, setGuardandoPago] = useState(false);
 
@@ -70,7 +73,7 @@ export default function ModalRegistroPagoMejorado({
     monto: "",
     metodo: "EFECTIVO",
     referencia: "",
-    fecha: new Date().toISOString().slice(0, 10),
+    fecha: new Date(),
   });
 
   // Estado para el voucher
@@ -147,7 +150,7 @@ export default function ModalRegistroPagoMejorado({
         monto: montoNumerico,
         metodo: datosPago.metodo,
         referencia: datosPago.referencia,
-        fecha: datosPago.fecha,
+        fecha: format(datosPago.fecha, "yyyy-MM-dd"),
       };
 
       console.log("💰 Registrando pago con datos:", datosEnvio);
@@ -199,7 +202,7 @@ export default function ModalRegistroPagoMejorado({
       monto: "",
       metodo: "EFECTIVO",
       referencia: "",
-      fecha: new Date().toISOString().slice(0, 10),
+      fecha: new Date(),
     });
     setPagoRegistrado(null);
   };
@@ -304,11 +307,15 @@ export default function ModalRegistroPagoMejorado({
               <Badge variant="outline">{envioSeleccionado?.estado}</Badge>
             </div>
             <div>
-              <Label className="text-muted-foreground capitalize">Cliente</Label>
+              <Label className="text-muted-foreground capitalize">
+                Cliente
+              </Label>
               <p>{envioSeleccionado?.cliente}</p>
             </div>
             <div>
-              <Label className="text-muted-foreground capitalize">Destinatario</Label>
+              <Label className="text-muted-foreground capitalize">
+                Destinatario
+              </Label>
               <p>{envioSeleccionado?.destinatario}</p>
             </div>
             <div>
@@ -353,7 +360,7 @@ export default function ModalRegistroPagoMejorado({
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
-            <div>
+            <div className="space-y-2">
               <Label htmlFor="monto">Monto a Pagar *</Label>
               <Input
                 id="monto"
@@ -368,7 +375,7 @@ export default function ModalRegistroPagoMejorado({
                 placeholder="0.00"
               />
             </div>
-            <div>
+            <div className="space-y-2">
               <Label htmlFor="metodo">Método de Pago *</Label>
               <Select
                 value={datosPago.metodo}
@@ -376,7 +383,7 @@ export default function ModalRegistroPagoMejorado({
                   setDatosPago((prev) => ({ ...prev, metodo: value }))
                 }
               >
-                <SelectTrigger>
+                <SelectTrigger className="w-full">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -390,7 +397,7 @@ export default function ModalRegistroPagoMejorado({
             </div>
           </div>
 
-          <div>
+          <div className="space-y-2">
             <Label htmlFor="referencia">Referencia</Label>
             <Input
               id="referencia"
@@ -405,15 +412,12 @@ export default function ModalRegistroPagoMejorado({
             />
           </div>
 
-          <div>
+          <div className="space-y-2">
             <Label htmlFor="fecha">Fecha del Pago *</Label>
-            <Input
-              id="fecha"
-              type="date"
-              value={datosPago.fecha}
-              onChange={(e) =>
-                setDatosPago((prev) => ({ ...prev, fecha: e.target.value }))
-              }
+            <DatePicker
+              date={datosPago.fecha}
+              setDate={(date) => ({ ...prev, fecha: date || new Date() })}
+              placeholder="Selecciona la fecha de pago"
             />
           </div>
         </CardContent>
@@ -523,21 +527,17 @@ export default function ModalRegistroPagoMejorado({
     </div>
   );
 
-  return (
-    <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-2xl  max-h-[90vh]">
-        <DialogHeader>
-          <DialogTitle>
-            {paso === 1 && "Buscar Envío"}
-            {paso === 2 && "Registrar Pago"}
-            {paso === 3 && "Voucher de Pago"}
-          </DialogTitle>
-        </DialogHeader>
+  const title = {
+    1: "Buscar Envío",
+    2: "Registrar Pago",
+    3: "Voucher de Pago",
+  };
 
-        {paso === 1 && renderPaso1()}
-        {paso === 2 && renderPaso2()}
-        {paso === 3 && renderPaso3()}
-      </DialogContent>
-    </Dialog>
+  return (
+    <Modal open={isOpen} onOpenChange={handleClose} title={title[paso]}>
+      {paso === 1 && renderPaso1()}
+      {paso === 2 && renderPaso2()}
+      {paso === 3 && renderPaso3()}
+    </Modal>
   );
 }

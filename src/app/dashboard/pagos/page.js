@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -23,44 +23,25 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import Paginator from "@/components/ui/paginator";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import { Textarea } from "@/components/ui/textarea";
-import { Separator } from "@/components/ui/separator";
+import Modal from "@/components/ui/modal";
 import {
   CreditCard,
-  DollarSign,
-  Calendar,
   CheckCircle,
   XCircle,
   Clock,
-  RefreshCw,
   Filter,
   Plus,
   Search,
   Eye,
   Printer,
-  X,
   Loader2,
   Mail,
 } from "lucide-react";
 import { toast } from "sonner";
-import {
-  getPagos,
-  registrarPago,
-  getPagosPorEnvio,
-  getPagoDetalle,
-} from "@/lib/actions/pagos";
-import { useEmpresaConfig } from "@/hooks/use-empresa-config";
+import { getPagos, getPagoDetalle } from "@/lib/actions/pagos";
 import { useDebounce } from "@/hooks/useDebounce";
 import ModalRegistroPagoMejorado from "@/components/pagos/modal-registro-pago-mejorado";
 import {
-  useEstadoFilter,
   useMetodoPago,
   useBusqueda,
   useFechaDesde,
@@ -68,6 +49,12 @@ import {
   usePage,
 } from "@/hooks/useQueryParams";
 import { useQueryState, parseAsBoolean, parseAsString } from "nuqs";
+import PagosResumen from "@/components/pagos/pagos-resumen";
+import PagosFiltros from "@/components/pagos/pagos-filtros";
+import PagosTabla from "@/components/pagos/pagos-tabla";
+import ModalDetalle from "@/components/pagos/modal-detalle";
+import { DataTable } from "@/components/ui/data-table";
+import { pagosColumns } from "@/components/pagos/pagos-columns";
 
 const estadosPago = [
   {
@@ -102,11 +89,8 @@ const metodosPago = [
 ];
 
 export default function PagosPage() {
-  const { empresaConfig } = useEmpresaConfig();
-
   const [loading, setLoading] = useState(false);
   const [showModal, setShowModal] = useState(false);
-  const [guardando, setGuardando] = useState(false);
 
   // Query params con nuqs (sincronizados con URL)
   const [estado, setEstado] = useQueryState(
@@ -145,70 +129,18 @@ export default function PagosPage() {
     [estado, metodo, busquedaDebounced, fechaDesde, fechaHasta, conSaldo]
   );
 
-  // Función para actualizar filtros (mantiene compatibilidad)
-  const setFiltros = (newFiltrosOrUpdater) => {
-    const newFiltros =
-      typeof newFiltrosOrUpdater === "function"
-        ? newFiltrosOrUpdater(filtros)
-        : newFiltrosOrUpdater;
-
-    if (newFiltros.estado !== undefined) {
-      setEstado(newFiltros.estado === "ALL" ? null : newFiltros.estado);
-    }
-    if (newFiltros.metodo !== undefined) {
-      setMetodo(newFiltros.metodo === "ALL" ? null : newFiltros.metodo);
-    }
-    if (newFiltros.busqueda !== undefined) {
-      setBusqueda(newFiltros.busqueda || null);
-    }
-    if (newFiltros.conSaldo !== undefined) {
-      setConSaldo(newFiltros.conSaldo || null);
-    }
-    if (newFiltros.rangoFechas) {
-      setFechaDesde(
-        newFiltros.rangoFechas.from
-          ? newFiltros.rangoFechas.from.toISOString().split("T")[0]
-          : null
-      );
-      setFechaHasta(
-        newFiltros.rangoFechas.to
-          ? newFiltros.rangoFechas.to.toISOString().split("T")[0]
-          : null
-      );
-    }
-  };
   const [totalPages, setTotalPages] = useState(1);
-  const [total, setTotal] = useState(0);
   const [pagos, setPagos] = useState([]);
 
   // Estados para modal de detalle
   const [detalleOpen, setDetalleOpen] = useState(false);
   const [detallePago, setDetallePago] = useState(null);
   const [detalleLoading, setDetalleLoading] = useState(false);
-  const [detalleSaldoPendiente, setDetalleSaldoPendiente] = useState(null);
-  const [detalleEstadoEnvio, setDetalleEstadoEnvio] = useState("");
-  const [ariaMessage, setAriaMessage] = useState("");
   const [imprimiendoId, setImprimiendoId] = useState(null);
-
-  // Estados para nuevo pago
-  const [nuevoPago, setNuevoPago] = useState({
-    cliente: "",
-    envio: "",
-    monto: "",
-    metodo: "EFECTIVO",
-    estado: "CONFIRMADO",
-    referencia: "",
-    fecha: new Date().toISOString().slice(0, 10),
+  const [pagination, setPagination] = useState({
+    pageIndex: 0,
+    pageSize: 10,
   });
-
-  // Estados para búsqueda de envíos
-  const [envioOpen, setEnvioOpen] = useState(false);
-  const [envioQuery, setEnvioQuery] = useState("");
-  const envioQueryDebounced = useDebounce(envioQuery, 300);
-  const [envioOptions, setEnvioOptions] = useState([]);
-  const [montoEditable, setMontoEditable] = useState(false);
-  const [envioResumen, setEnvioResumen] = useState(null);
-  const envioInputRef = useRef(null);
 
   // Filtrar pagos
   const pagosFiltrados = pagos.filter((p) => {
@@ -269,7 +201,6 @@ export default function PagosPage() {
       if (resultado.success) {
         setPagos(resultado.data.pagos || []);
         setTotalPages(resultado.data.totalPages || 1);
-        setTotal(resultado.data.total || 0);
       } else {
         toast.error("Error al cargar pagos");
       }
@@ -278,41 +209,6 @@ export default function PagosPage() {
       toast.error("Error al cargar pagos");
     } finally {
       setLoading(false);
-    }
-  };
-
-  // Registrar nuevo pago
-  const registrarPagoHandler = async () => {
-    if (!nuevoPago.envio || !nuevoPago.monto || !nuevoPago.metodo) {
-      toast.error("Completa guía, monto y método");
-      return;
-    }
-
-    try {
-      setGuardando(true);
-      const resultado = await registrarPago(nuevoPago);
-
-      if (resultado.success) {
-        toast.success("Pago registrado correctamente");
-        setShowModal(false);
-        setNuevoPago({
-          cliente: "",
-          envio: "",
-          monto: "",
-          metodo: "EFECTIVO",
-          estado: "CONFIRMADO",
-          referencia: "",
-          fecha: new Date().toISOString().slice(0, 10),
-        });
-        cargarPagos();
-      } else {
-        toast.error(resultado.error || "Error al registrar pago");
-      }
-    } catch (error) {
-      console.error("Error al registrar pago:", error);
-      toast.error("Error al registrar pago");
-    } finally {
-      setGuardando(false);
     }
   };
 
@@ -398,6 +294,37 @@ export default function PagosPage() {
     filtros.conSaldo,
   ]);
 
+  const actions = {
+    verDetalle,
+    imprimir: imprimirVoucherPago,
+    reenviarEmail: reenviarEmailPago,
+  };
+
+  // Convertir filtros 'nuqs' a filtros de React Table
+  const initialColumnFilters = useMemo(() => {
+    const filters = [];
+
+    // Filtro por Estado
+    if (estado && estado !== "ALL") {
+      filters.push({ id: "estado", value: estado });
+    }
+
+    // Filtro por Método
+    if (metodo && metodo !== "ALL") {
+      filters.push({ id: "metodo", value: metodo });
+    }
+
+    return filters;
+  }, [estado, metodo]);
+
+  // Definir un estado local para los filtros (opcional, pero ayuda a controlar)
+  const [columnFilters, setColumnFilters] = useState(initialColumnFilters);
+
+  // Mantener el estado de React Table sincronizado con los filtros de URL (nuqs)
+  useEffect(() => {
+    setColumnFilters(initialColumnFilters);
+  }, [initialColumnFilters]);
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -417,287 +344,36 @@ export default function PagosPage() {
       </div>
 
       {/* Resumen */}
-      <div className="grid gap-4 md:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Pagos</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              S/ {resumen.total.toLocaleString()}
-            </div>
-          </CardContent>
-        </Card>
+      <PagosResumen resumen={resumen} />
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Confirmados</CardTitle>
-            <CheckCircle className="h-4 w-4 text-green-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-green-600">
-              {resumen.confirmados}
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Pendientes</CardTitle>
-            <Clock className="h-4 w-4 text-yellow-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-yellow-600">
-              {resumen.pendientes}
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Rechazados</CardTitle>
-            <XCircle className="h-4 w-4 text-red-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-red-600">
-              {resumen.rechazados}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Filtros */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Filter className="h-5 w-5" />
-            Filtros
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid gap-4 md:grid-cols-5">
-            <div>
-              <Label>Buscar</Label>
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Cliente, envío, referencia..."
-                  value={busqueda}
-                  onChange={(e) => {
-                    setBusqueda(e.target.value || null);
-                    setPage(1);
-                  }}
-                  className="pl-10"
-                />
-              </div>
-            </div>
-
-            <div>
-              <Label>Estado</Label>
-              <Select
-                value={estado}
-                onValueChange={(value) => {
-                  setEstado(value === "ALL" ? null : value);
-                  setPage(1);
-                }}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="ALL">Todos</SelectItem>
-                  {estadosPago.map((estadoItem) => (
-                    <SelectItem key={estadoItem.value} value={estadoItem.value}>
-                      {estadoItem.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div>
-              <Label>Método</Label>
-              <Select
-                value={metodo}
-                onValueChange={(value) => {
-                  setMetodo(value === "ALL" ? null : value);
-                  setPage(1);
-                }}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="ALL">Todos</SelectItem>
-                  {metodosPago.map((metodoItem) => (
-                    <SelectItem key={metodoItem.value} value={metodoItem.value}>
-                      {metodoItem.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="flex items-center space-x-2 mt-6">
-              <Switch
-                id="con-saldo"
-                checked={conSaldo}
-                onCheckedChange={(checked) => {
-                  setConSaldo(checked || null);
-                  setPage(1);
-                }}
-              />
-              <Label htmlFor="con-saldo">Con saldo pendiente</Label>
-            </div>
-
-            <div className="flex items-end">
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setEstado(null);
-                  setMetodo(null);
-                  setBusqueda(null);
-                  setFechaDesde(null);
-                  setFechaHasta(null);
-                  setConSaldo(null);
-                  setPage(1);
-                }}
-              >
-                Limpiar
-              </Button>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Tabla de pagos */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Lista de Pagos</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {loading ? (
-            <div className="flex items-center justify-center py-8">
-              <Loader2 className="h-6 w-6 animate-spin mr-2" />
-              <span>Cargando pagos...</span>
-            </div>
-          ) : (
-            <>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Fecha</TableHead>
-                    <TableHead>Cliente</TableHead>
-                    <TableHead>Envío</TableHead>
-                    <TableHead>Método</TableHead>
-                    <TableHead>Monto</TableHead>
-                    <TableHead>Estado</TableHead>
-                    <TableHead>Acciones</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {pagosFiltrados.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={7} className="text-center py-8">
-                        <CreditCard className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                        <h3 className="text-lg font-medium mb-2">
-                          No hay pagos
-                        </h3>
-                        <p className="text-muted-foreground">
-                          No se encontraron pagos que coincidan con los filtros
-                          aplicados
-                        </p>
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    pagosFiltrados.map((pago) => {
-                      const estadoConfig = estadosPago.find(
-                        (e) => e.value === pago.estado
-                      );
-                      const IconoEstado = estadoConfig?.icon || Clock;
-
-                      return (
-                        <TableRow key={pago.id}>
-                          <TableCell>
-                            {new Date(pago.fecha).toLocaleDateString()}
-                          </TableCell>
-                          <TableCell>{pago.cliente}</TableCell>
-                          <TableCell className="font-mono">
-                            {pago.envio}
-                          </TableCell>
-                          <TableCell>
-                            {metodosPago.find((m) => m.value === pago.metodo)
-                              ?.label || pago.metodo}
-                          </TableCell>
-                          <TableCell className="font-semibold">
-                            S/ {pago.monto.toLocaleString()}
-                          </TableCell>
-                          <TableCell>
-                            <Badge className={estadoConfig?.color}>
-                              <IconoEstado className="h-3 w-3 mr-1" />
-                              {estadoConfig?.label || pago.estado}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex gap-1">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => verDetalle(pago.id)}
-                                title="Ver detalle"
-                              >
-                                <Eye className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => imprimirVoucherPago(pago)}
-                                disabled={imprimiendoId === pago.id}
-                                title="Reimprimir voucher"
-                              >
-                                {imprimiendoId === pago.id ? (
-                                  <Loader2 className="h-4 w-4 animate-spin" />
-                                ) : (
-                                  <Printer className="h-4 w-4" />
-                                )}
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => reenviarEmailPago(pago.id)}
-                                disabled={imprimiendoId === pago.id}
-                                title="Reenviar email"
-                              >
-                                {imprimiendoId === pago.id ? (
-                                  <Loader2 className="h-4 w-4 animate-spin" />
-                                ) : (
-                                  <Mail className="h-4 w-4" />
-                                )}
-                              </Button>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })
-                  )}
-                </TableBody>
-              </Table>
-
-              {/* Paginación */}
-              {totalPages > 1 && (
-                <div className="mt-4">
-                  <Paginator
-                    currentPage={page}
-                    totalPages={totalPages}
-                    onPageChange={setPage}
-                  />
-                </div>
-              )}
-            </>
-          )}
-        </CardContent>
-      </Card>
+      {/* DataTable */}
+      <DataTable
+        columns={pagosColumns(actions)}
+        data={pagos}
+        searchKey="cliente"
+        searchPlaceholder="Buscar por cliente..."
+        emptyMessage="No se encontraron pagos"
+        emptyIcon={CreditCard}
+        columnFilters={columnFilters}
+        setColumnFilters={setColumnFilters}
+        pagination={pagination}
+        setPagination={setPagination}
+        renderComponents={
+          <PagosFiltros
+            busqueda={busqueda}
+            setBusqueda={setBusqueda}
+            estado={estado}
+            setEstado={setEstado}
+            conSaldo={conSaldo}
+            estadosPago={estadosPago}
+            metodo={metodo}
+            metodosPago={metodosPago}
+            setConSaldo={setConSaldo}
+            setMetodo={setMetodo}
+            setPage={setPage}
+          />
+        }
+      />
 
       {/* Modal mejorado para registrar pago */}
       <ModalRegistroPagoMejorado
@@ -707,71 +383,13 @@ export default function PagosPage() {
       />
 
       {/* Modal de detalle */}
-      <Dialog open={detalleOpen} onOpenChange={setDetalleOpen}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>Detalle del Pago</DialogTitle>
-          </DialogHeader>
-          {detalleLoading ? (
-            <div className="flex items-center justify-center py-8">
-              <Loader2 className="h-6 w-6 animate-spin mr-2" />
-              <span>Cargando detalle...</span>
-            </div>
-          ) : detallePago ? (
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label className="text-muted-foreground">ID del Pago</Label>
-                  <p className="font-mono">{detallePago.id}</p>
-                </div>
-                <div>
-                  <Label className="text-muted-foreground">Fecha</Label>
-                  <p>{new Date(detallePago.fecha).toLocaleDateString()}</p>
-                </div>
-                <div>
-                  <Label className="text-muted-foreground">Cliente</Label>
-                  <p>{detallePago.cliente}</p>
-                </div>
-                <div>
-                  <Label className="text-muted-foreground">Envío</Label>
-                  <p className="font-mono">{detallePago.envio}</p>
-                </div>
-                <div>
-                  <Label className="text-muted-foreground">Método</Label>
-                  <p>
-                    {
-                      metodosPago.find((m) => m.value === detallePago.metodo)
-                        ?.label
-                    }
-                  </p>
-                </div>
-                <div>
-                  <Label className="text-muted-foreground">Monto</Label>
-                  <p className="text-lg font-semibold">
-                    S/ {detallePago.monto.toLocaleString()}
-                  </p>
-                </div>
-              </div>
-
-              {detallePago.referencia && (
-                <div>
-                  <Label className="text-muted-foreground">Referencia</Label>
-                  <p>{detallePago.referencia}</p>
-                </div>
-              )}
-
-              {detallePago.observaciones && (
-                <div>
-                  <Label className="text-muted-foreground">Observaciones</Label>
-                  <p>{detallePago.observaciones}</p>
-                </div>
-              )}
-            </div>
-          ) : (
-            <p>No se pudo cargar el detalle del pago</p>
-          )}
-        </DialogContent>
-      </Dialog>
+      <ModalDetalle
+        detallePago={detallePago}
+        detalleLoading={detalleLoading}
+        detalleOpen={detalleOpen}
+        setDetalleOpen={setDetalleOpen}
+        metodosPago={metodosPago}
+      />
     </div>
   );
 }

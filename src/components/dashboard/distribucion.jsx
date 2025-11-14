@@ -66,32 +66,30 @@ export default function Distribucion({
   return (
     <Card>
       <CardHeader>
-        <div className="flex flex-col gap-2 items-center justify-between">
-          <div className="space-y-1">
-            <CardTitle className="flex items-center gap-2">
-              <BarChart3 className="h-5 w-5" /> Distribución por Estado
-            </CardTitle>
-            <CardDescription>Proporción de envíos por estado</CardDescription>
-          </div>
-          <div className="flex items-center gap-2 space-y-1">
-            <Calendar className="h-4 w-4 text-muted-foreground" />
-            <Select value={mesSeleccionado} onValueChange={handleMesChange}>
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Seleccionar mes" />
-              </SelectTrigger>
-              <SelectContent>
-                {mesesDisponibles.length > 0 ? (
-                  mesesDisponibles.map((mes) => (
-                    <SelectItem key={mes.value} value={mes.value}>
-                      {mes.label}
-                    </SelectItem>
-                  ))
-                ) : (
-                  <SelectItem value={mesSeleccionado}>{mesLabel}</SelectItem>
-                )}
-              </SelectContent>
-            </Select>
-          </div>
+        <div>
+          <CardTitle className="flex items-center gap-2">
+            <BarChart3 className="h-5 w-5" /> Distribución por Estado
+          </CardTitle>
+          <CardDescription>Proporción de envíos por estado</CardDescription>
+        </div>
+        <div className="flex items-center gap-2 space-y-1">
+          <Calendar className="h-4 w-4 text-muted-foreground" />
+          <Select value={mesSeleccionado} onValueChange={handleMesChange}>
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder="Seleccionar mes" />
+            </SelectTrigger>
+            <SelectContent>
+              {mesesDisponibles.length > 0 ? (
+                mesesDisponibles.map((mes) => (
+                  <SelectItem key={mes.value} value={mes.value}>
+                    {mes.label}
+                  </SelectItem>
+                ))
+              ) : (
+                <SelectItem value={mesSeleccionado}>{mesLabel}</SelectItem>
+              )}
+            </SelectContent>
+          </Select>
         </div>
 
         {dominantState && (
@@ -111,54 +109,106 @@ export default function Distribucion({
       </CardHeader>
       <CardContent>
         {estadosData.length === 0 ? (
-          <div className="text-sm text-muted-foreground">
+          <div className="text-xs sm:text-sm text-muted-foreground py-8 text-center">
             Sin datos para el período.
           </div>
         ) : (
-          <ChartContainer
-            config={chartConfig}
-            className="mx-auto aspect-square max-h-[320px]"
-          >
-            <PieChart>
-              <ChartTooltip
-                cursor={false}
-                content={
-                  <ChartTooltipContent
-                    labelKey="estado"
-                    nameKey="estado"
-                    formatter={(value, name, props) => {
-                      const estado = props.payload.estado;
-                      const label = getEstadoLabel(estado);
-                      return [value, label];
-                    }}
-                  />
-                }
-              />
-              <Pie
-                data={estadosData}
-                dataKey="cantidad"
-                nameKey="estado"
-                innerRadius={60}
-                strokeWidth={5}
-              >
-                {estadosData.map((entry, index) => (
-                  <Cell
-                    key={`cell-${index}`}
-                    fill={chartConfig[entry.estado]?.color}
-                  />
-                ))}
-              </Pie>
-              <ChartLegend
-                content={
-                  <ChartLegendContent
-                    nameKey="estado"
-                    formatter={(value) => getEstadoLabel(value)}
-                  />
-                }
-                className="-translate-y-2 flex-wrap gap-2 *:basis-1/3 *:justify-center"
-              />
-            </PieChart>
-          </ChartContainer>
+          <>
+            <ChartContainer
+              config={chartConfig}
+              className="mx-auto aspect-square max-h-[320px]"
+            >
+              <PieChart>
+                <ChartTooltip
+                  cursor={false}
+                  content={
+                    <ChartTooltipContent
+                      labelKey="estado"
+                      nameKey="estado"
+                      formatter={(value, name, props) => {
+                        const total = estadosData.reduce(
+                          (sum, item) => sum + item.cantidad,
+                          0
+                        );
+                        const porcentaje = (
+                          (props.payload.cantidad / total) *
+                          100
+                        ).toFixed(1);
+                        return [
+                          `${props.payload.cantidad} (${porcentaje}%) `,
+                          getEstadoLabel(props.payload.estado),
+                        ];
+                      }}
+                    />
+                  }
+                />
+                <Pie
+                  data={estadosData}
+                  dataKey="cantidad"
+                  nameKey="estado"
+                  innerRadius={60}
+                  strokeWidth={2}
+                  outerRadius={90}
+                >
+                  {estadosData.map((entry, index) => (
+                    <Cell
+                      key={`cell-${index}`}
+                      fill={chartConfig[entry.estado]?.color}
+                    />
+                  ))}
+                </Pie>
+                <ChartLegend
+                  content={
+                    <ChartLegendContent
+                      nameKey="estado"
+                      formatter={(value) => getEstadoLabel(value)}
+                    />
+                  }
+                  className="-translate-y-1 flex-wrap gap-2 *:justify-center text-xs sm:text-sm"
+                />
+              </PieChart>
+            </ChartContainer>
+
+            <div className="border-t pt-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                {estadosData.map((item) => {
+                  const total = estadosData.reduce(
+                    (sum, i) => sum + i.cantidad,
+                    0
+                  );
+                  const porcentaje = ((item.cantidad / total) * 100).toFixed(1);
+
+                  return (
+                    <div
+                      key={item.estado}
+                      className="p-3 sm:p-4 rounded-lg bg-muted/50 hover:bg-muted transition-colors"
+                    >
+                      <div className="flex items-center gap-2 mb-2">
+                        <div
+                          className="w-3 h-3 rounded-full flex-shrink-0"
+                          style={{
+                            backgroundColor: chartConfig[item.estado]?.color,
+                          }}
+                        />
+                        <span className="text-sm sm:text-base font-medium truncate">
+                          {getEstadoLabel(item.estado)}
+                        </span>
+                      </div>
+
+                      <div className="flex items-baseline gap-2 mt-1">
+                        <div className="text-xl sm:text-2xl font-bold">
+                          {item.cantidad}
+                        </div>
+                        <div className="text-sm text-muted-foreground">
+                          ({porcentaje}%)
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </>
         )}
       </CardContent>
     </Card>

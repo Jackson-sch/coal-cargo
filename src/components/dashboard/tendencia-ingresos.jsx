@@ -1,4 +1,3 @@
-
 import {
   Card,
   CardContent,
@@ -20,10 +19,11 @@ import {
   ChartTooltipContent,
 } from "@/components/ui/chart";
 import { TrendingUp, Calendar } from "lucide-react";
+import { formatSoles } from "@/lib/utils/formatters";
 
-export default function TendenciaIngresos({ 
-  trend, 
-  mesSeleccionado, 
+export default function TendenciaIngresos({
+  trend,
+  mesSeleccionado,
   setMesSeleccionado,
   mesesDisponibles = [],
 }) {
@@ -32,44 +32,42 @@ export default function TendenciaIngresos({
   };
 
   // Obtener el label del mes seleccionado
-  const mesLabel = mesesDisponibles.find((m) => m.value === mesSeleccionado)?.label || 
-    (mesSeleccionado 
-      ? new Date(mesSeleccionado + "-01").toLocaleString("es-PE", { month: "long", year: "numeric" })
+  const mesLabel =
+    mesesDisponibles.find((m) => m.value === mesSeleccionado)?.label ||
+    (mesSeleccionado
+      ? new Date(mesSeleccionado + "-01").toLocaleString("es-PE", {
+          month: "long",
+          year: "numeric",
+        })
       : "Mes actual");
 
   return (
     <Card>
       <CardHeader>
-        <div className="flex items-center justify-between">
-          <div>
-            <CardTitle className="flex items-center gap-2">
-              <TrendingUp className="h-5 w-5" /> Tendencia de Ingresos
-            </CardTitle>
-            <CardDescription>
-              Evolución de ingresos del período seleccionado
-            </CardDescription>
-          </div>
-          <div className="flex items-center gap-2">
-            <Calendar className="h-4 w-4 text-muted-foreground" />
-            <Select value={mesSeleccionado} onValueChange={handleMesChange}>
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Seleccionar mes" />
-              </SelectTrigger>
-              <SelectContent>
-                {mesesDisponibles.length > 0 ? (
-                  mesesDisponibles.map((mes) => (
-                    <SelectItem key={mes.value} value={mes.value}>
-                      {mes.label}
-                    </SelectItem>
-                  ))
-                ) : (
-                  <SelectItem value={mesSeleccionado}>
-                    {mesLabel}
+        <CardTitle className="flex items-center gap-2">
+          <TrendingUp className="h-5 w-5" /> Tendencia de Ingresos
+        </CardTitle>
+        <CardDescription>
+          Evolución de ingresos del período seleccionado
+        </CardDescription>
+        <div className="flex mt-3 items-center gap-3">
+          <Calendar className="h-4 w-4 text-muted-foreground" />
+          <Select value={mesSeleccionado} onValueChange={handleMesChange}>
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder="Seleccionar mes" />
+            </SelectTrigger>
+            <SelectContent>
+              {mesesDisponibles.length > 0 ? (
+                mesesDisponibles.map((mes) => (
+                  <SelectItem key={mes.value} value={mes.value}>
+                    {mes.label}
                   </SelectItem>
-                )}
-              </SelectContent>
-            </Select>
-          </div>
+                ))
+              ) : (
+                <SelectItem value={mesSeleccionado}>{mesLabel}</SelectItem>
+              )}
+            </SelectContent>
+          </Select>
         </div>
       </CardHeader>
       <CardContent>
@@ -79,37 +77,65 @@ export default function TendenciaIngresos({
             className="w-full h-[250px]"
           >
             <AreaChart
+              accessibilityLayer
               data={trend.ingresosPorMes}
-              margin={{ left: 12, right: 12, top: 8, bottom: 20 }}
+              margin={{ left: 12, right: 12 }}
             >
               <CartesianGrid strokeDasharray="3 3" vertical={false} />
-              <XAxis 
-                dataKey="mes" 
-                tickLine={false} 
+              <XAxis
+                dataKey="mes"
+                tickLine={false}
                 axisLine={false}
+                tickMargin={8}
                 angle={-45}
                 textAnchor="end"
                 height={60}
-                interval={trend.ingresosPorMes.length > 15 ? "preserveStartEnd" : 0}
+                interval={
+                  trend.ingresosPorMes.length > 15 ? "preserveStartEnd" : 0
+                }
               />
               <ChartTooltip
-                content={<ChartTooltipContent 
-                  nameKey="ingresos"
-                  labelFormatter={(value) => {
-                    // Buscar el item completo para mostrar más información
-                    const item = trend.ingresosPorMes.find((d) => d.mes === value);
-                    return item ? `${value} - ${item.envios || 0} envíos` : value;
-                  }}
-                  formatter={(value) => [`S/ ${Number(value).toLocaleString("es-PE")}`, "Ingresos"]}
-                />}
+                content={
+                  <ChartTooltipContent
+                    nameKey="ingresos"
+                    labelFormatter={(value) => {
+                      // Buscar el item completo para mostrar más información
+                      const item = trend.ingresosPorMes.find(
+                        (d) => d.mes === value
+                      );
+                      return item
+                        ? `${value} - ${item.envios || 0} envíos`
+                        : value;
+                    }}
+                    formatter={(value) => [
+                      `${formatSoles(Number(value))} `,
+                      "Ingresos",
+                    ]}
+                  />
+                }
               />
+              <defs>
+                <linearGradient id="fillIngresos" x1="0" y1="0" x2="0" y2="1">
+                  <stop
+                    offset="5%"
+                    stopColor="var(--color-ingresos)"
+                    stopOpacity={0.8}
+                  />
+                  <stop
+                    offset="95%"
+                    stopColor="var(--color-ingresos)"
+                    stopOpacity={0.1}
+                  />
+                </linearGradient>
+              </defs>
+
               <Area
                 type="monotone"
                 dataKey="ingresos"
                 stroke="var(--color-ingresos)"
-                fill="var(--color-ingresos)"
-                fillOpacity={0.2}
-                strokeWidth={2}
+                fill="url(#fillIngresos)"
+                fillOpacity={0.4}
+                stackId="a"
               />
             </AreaChart>
           </ChartContainer>
